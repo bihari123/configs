@@ -44,7 +44,8 @@ white = '#f0f6fc'
 [window]
 opacity = 0.95
 blur = true
-decorations = "None"
+decorations = "Full"
+startup_mode = "Windowed"
 
 [window.padding]
 x = 20
