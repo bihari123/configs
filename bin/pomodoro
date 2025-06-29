@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Pomodoro Timer Script with Big Digits and Session Logging
+# Pomodoro Timer Script with 7-Segment LED Display
 # Usage: pomodoro [work_minutes] [break_minutes]
 
 # Default durations
@@ -17,75 +17,77 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 MAGENTA='\033[0;35m'
+BRIGHT_RED='\033[1;91m'
+BRIGHT_GREEN='\033[1;92m'
 NC='\033[0m' # No Color
 
-# 8-bit LED display style digit patterns
+# 7-segment display patterns using box drawing characters
 declare -A DIGITS
-DIGITS[0]=" ▄▄▄▄ 
-█    █
-█    █
-█    █
- ▀▀▀▀ "
+DIGITS[0]=" ╔═══╗ 
+ ║   ║ 
+ ║   ║ 
+ ║   ║ 
+ ╚═══╝ "
 
-DIGITS[1]="      
-     █
-     █
-     █
-      "
+DIGITS[1]="     ╗ 
+     ║ 
+     ║ 
+     ║ 
+     ╝ "
 
-DIGITS[2]=" ▄▄▄▄ 
-     █
- ▄▄▄▄ 
-█     
- ▀▀▀▀ "
+DIGITS[2]=" ╔═══╗ 
+     ║ 
+ ╔═══╝ 
+ ║     
+ ╚═══╝ "
 
-DIGITS[3]=" ▄▄▄▄ 
-     █
- ▄▄▄▄ 
-     █
- ▀▀▀▀ "
+DIGITS[3]=" ╔═══╗ 
+     ║ 
+ ╔═══╣ 
+     ║ 
+ ╚═══╝ "
 
-DIGITS[4]="      
-█    █
- ▀▀▀▀█
-     █
-      "
+DIGITS[4]=" ╔   ╗ 
+ ║   ║ 
+ ╚═══╣ 
+     ║ 
+     ╝ "
 
-DIGITS[5]=" ▄▄▄▄ 
-█     
- ▀▀▀▀ 
-     █
- ▄▄▄▄ "
+DIGITS[5]=" ╔═══╗ 
+ ║     
+ ╚═══╗ 
+     ║ 
+ ╚═══╝ "
 
-DIGITS[6]=" ▄▄▄▄ 
-█     
- ▄▄▄▄ 
-█    █
- ▀▀▀▀ "
+DIGITS[6]=" ╔═══╗ 
+ ║     
+ ╠═══╗ 
+ ║   ║ 
+ ╚═══╝ "
 
-DIGITS[7]=" ▄▄▄▄ 
-     █
-     █
-     █
-      "
+DIGITS[7]=" ╔═══╗ 
+     ║ 
+     ║ 
+     ║ 
+     ╝ "
 
-DIGITS[8]=" ▄▄▄▄ 
-█    █
- ▄▄▄▄ 
-█    █
- ▀▀▀▀ "
+DIGITS[8]=" ╔═══╗ 
+ ║   ║ 
+ ╠═══╣ 
+ ║   ║ 
+ ╚═══╝ "
 
-DIGITS[9]=" ▄▄▄▄ 
-█    █
- ▀▀▀▀█
-     █
- ▄▄▄▄ "
+DIGITS[9]=" ╔═══╗ 
+ ║   ║ 
+ ╚═══╣ 
+     ║ 
+ ╚═══╝ "
 
-DIGITS[:]="      
-   ▀  
-      
-   ▀  
-      "
+DIGITS[:]="       
+   ●   
+       
+   ●   
+       "
 
 # Function to display big digits
 display_big_time() {
@@ -104,12 +106,12 @@ display_big_time() {
         if [[ -n "${DIGITS[$char]}" ]]; then
             IFS=$'\n' read -rd '' -a digit_lines <<< "${DIGITS[$char]}"
             for j in {0..4}; do
-                lines[$j]+="${digit_lines[$j]} "
+                lines[$j]+="${digit_lines[$j]}  "
             done
         fi
     done
     
-    # Print the big digits
+    # Print the big digits with color
     echo -e "${color}"
     for line in "${lines[@]}"; do
         echo "$line"
@@ -237,7 +239,7 @@ echo ""
 # Main loop
 while true; do
     # Work session
-    run_timer $WORK_MINS "Work" "🍅" "$RED"
+    run_timer $WORK_MINS "Work" "🍅" "$BRIGHT_RED"
     notify "Pomodoro Complete!" "Time for a ${BREAK_MINS} minute break!"
     
     echo ""
@@ -253,7 +255,7 @@ while true; do
     fi
     
     # Break session
-    run_timer $BREAK_MINS "Break" "☕" "$GREEN"
+    run_timer $BREAK_MINS "Break" "☕" "$BRIGHT_GREEN"
     notify "Break Complete!" "Ready for another pomodoro?"
     
     echo ""
