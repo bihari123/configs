@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Pomodoro Timer Script
+# Usage: pomodoro [work_minutes] [break_minutes]
+
+# Default durations
+WORK_MINS=${1:-25}
+BREAK_MINS=${2:-5}
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to display time in MM:SS format
+format_time() {
+    local total_seconds=$1
+    local minutes=$((total_seconds / 60))
+    local seconds=$((total_seconds % 60))
+    printf "%02d:%02d" $minutes $seconds
+}
+
+# Function to show notification
+notify() {
+    local title=$1
+    local message=$2
+    
+    # Try different notification methods
+    if command -v notify-send &> /dev/null; then
+        # High priority notification with critical urgency
+        notify-send -u critical "$title" "$message" -i time -t 0
+    elif command -v osascript &> /dev/null; then
+        # macOS alert dialog (more prominent than notification)
+        osascript -e "display alert \"$title\" message \"$message\" buttons {\"OK\"} default button 1"
+    fi
+    
+    # Terminal bell (multiple times for emphasis)
+    for i in {1..3}; do
+        echo -e "\a"
+        sleep 0.2
+    done
+    
+    # Try zenity for GUI alert if available
+    if command -v zenity &> /dev/null; then
+        zenity --info --title="$title" --text="$message" --width=300 2>/dev/null &
+    fi
+}
+
+# Function to run timer
+run_timer() {
+    local duration=$1
+    local timer_type=$2
+    local emoji=$3
+    local color=$4
+    
+    local total_seconds=$((duration * 60))
+    
+    echo -e "${color}${emoji} Starting ${timer_type} timer: ${duration} minutes${NC}"
+    echo ""
+    
+    while [ $total_seconds -gt 0 ]; do
+        echo -ne "${color}${emoji} ${timer_type}: $(format_time $total_seconds)${NC}\r"
+        sleep 1
+        ((total_seconds--))
+    done
+    
+    echo -e "${color}${emoji} ${timer_type} Complete!                    ${NC}"
+}
+
+# Main loop
+while true; do
+    # Work session
+    run_timer $WORK_MINS "Work" "🍅" "$RED"
+    notify "Pomodoro Complete!" "Time for a ${BREAK_MINS} minute break!"
+    
+    echo ""
+    echo -e "${YELLOW}Press Enter to start break, or Ctrl+C to exit${NC}"
+    read -r
+    
+    # Break session
+    run_timer $BREAK_MINS "Break" "☕" "$GREEN"
+    notify "Break Complete!" "Ready for another pomodoro?"
+    
+    echo ""
+    echo -e "${YELLOW}Press Enter to start next pomodoro, or Ctrl+C to exit${NC}"
+    read -r
+done
