@@ -1,18 +1,156 @@
 #!/bin/bash
 
-# Pomodoro Timer Script
+# Pomodoro Timer Script with Big Digits and Session Logging
 # Usage: pomodoro [work_minutes] [break_minutes]
 
 # Default durations
 WORK_MINS=${1:-25}
 BREAK_MINS=${2:-5}
 
+# Log file location
+LOG_FILE="$HOME/.pomodoro_log"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m' # No Color
+
+# Big digit patterns
+declare -A DIGITS
+DIGITS[0]=" ███ 
+█   █
+█   █
+█   █
+ ███ "
+
+DIGITS[1]="  █  
+ ██  
+  █  
+  █  
+█████"
+
+DIGITS[2]=" ███ 
+█   █
+   █ 
+  █  
+█████"
+
+DIGITS[3]=" ███ 
+█   █
+  ██ 
+█   █
+ ███ "
+
+DIGITS[4]="█   █
+█   █
+█████
+    █
+    █"
+
+DIGITS[5]="█████
+█    
+████ 
+    █
+████ "
+
+DIGITS[6]=" ███ 
+█    
+████ 
+█   █
+ ███ "
+
+DIGITS[7]="█████
+    █
+   █ 
+  █  
+ █   "
+
+DIGITS[8]=" ███ 
+█   █
+ ███ 
+█   █
+ ███ "
+
+DIGITS[9]=" ███ 
+█   █
+ ████
+    █
+ ███ "
+
+DIGITS[:]="     
+  █  
+     
+  █  
+     "
+
+# Function to display big digits
+display_big_time() {
+    local time_str=$1
+    local color=$2
+    
+    # Clear previous lines (5 lines for big digits + 2 extra)
+    for i in {1..7}; do
+        echo -ne "\033[1A\033[2K"
+    done
+    
+    # Convert each character to big digit
+    local lines=("" "" "" "" "")
+    for (( i=0; i<${#time_str}; i++ )); do
+        char="${time_str:$i:1}"
+        if [[ -n "${DIGITS[$char]}" ]]; then
+            IFS=$'\n' read -rd '' -a digit_lines <<< "${DIGITS[$char]}"
+            for j in {0..4}; do
+                lines[$j]+="${digit_lines[$j]} "
+            done
+        fi
+    done
+    
+    # Print the big digits
+    echo -e "${color}"
+    for line in "${lines[@]}"; do
+        echo "$line"
+    done
+    echo -e "${NC}"
+}
+
+# Function to log session
+log_session() {
+    local session_type=$1
+    local duration=$2
+    local timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+    echo "$timestamp|$session_type|$duration" >> "$LOG_FILE"
+}
+
+# Function to display session log
+show_log() {
+    if [ ! -f "$LOG_FILE" ]; then
+        echo -e "${YELLOW}No sessions logged yet.${NC}"
+        return
+    fi
+    
+    echo -e "${CYAN}╔══════════════════════╤═══════════╤══════════╗${NC}"
+    echo -e "${CYAN}║     Timestamp        │   Type    │ Duration ║${NC}"
+    echo -e "${CYAN}╠══════════════════════╪═══════════╪══════════╣${NC}"
+    
+    tail -n 10 "$LOG_FILE" | while IFS='|' read -r timestamp type duration; do
+        printf "${CYAN}║${NC} %-20s ${CYAN}│${NC} %-9s ${CYAN}│${NC} %6s m ${CYAN}║${NC}\n" "$timestamp" "$type" "$duration"
+    done
+    
+    echo -e "${CYAN}╚══════════════════════╧═══════════╧══════════╝${NC}"
+    
+    # Show today's summary
+    local today=$(date "+%Y-%m-%d")
+    local work_count=$(grep "$today.*Work" "$LOG_FILE" 2>/dev/null | wc -l)
+    local total_work=$(grep "$today.*Work" "$LOG_FILE" 2>/dev/null | awk -F'|' '{sum += $3} END {print sum+0}')
+    
+    echo -e "\n${MAGENTA}Today's Summary:${NC}"
+    echo -e "Pomodoros completed: ${work_count}"
+    echo -e "Total work time: ${total_work} minutes"
+}
 
 # Function to display time in MM:SS format
 format_time() {
@@ -48,7 +186,7 @@ notify() {
     fi
 }
 
-# Function to run timer
+# Function to run timer with big digits
 run_timer() {
     local duration=$1
     local timer_type=$2
@@ -56,18 +194,45 @@ run_timer() {
     local color=$4
     
     local total_seconds=$((duration * 60))
+    local start_seconds=$total_seconds
     
     echo -e "${color}${emoji} Starting ${timer_type} timer: ${duration} minutes${NC}"
     echo ""
     
+    # Initial empty lines for big digit display
+    for i in {1..5}; do
+        echo ""
+    done
+    
     while [ $total_seconds -gt 0 ]; do
-        echo -ne "${color}${emoji} ${timer_type}: $(format_time $total_seconds)${NC}\r"
+        local time_formatted=$(format_time $total_seconds)
+        display_big_time "$time_formatted" "$color"
+        echo -ne "${color}${emoji} ${timer_type} in progress...${NC}"
         sleep 1
         ((total_seconds--))
     done
     
-    echo -e "${color}${emoji} ${timer_type} Complete!                    ${NC}"
+    # Clear the display area
+    for i in {1..7}; do
+        echo -ne "\033[1A\033[2K"
+    done
+    
+    echo -e "${color}${emoji} ${timer_type} Complete!${NC}"
+    
+    # Log the session
+    log_session "$timer_type" "$duration"
 }
+
+# Clear screen and show header
+clear
+echo -e "${MAGENTA}╔════════════════════════════════╗${NC}"
+echo -e "${MAGENTA}║      POMODORO TIMER v2.0       ║${NC}"
+echo -e "${MAGENTA}╚════════════════════════════════╝${NC}"
+echo ""
+
+# Show session log
+show_log
+echo ""
 
 # Main loop
 while true; do
@@ -76,14 +241,32 @@ while true; do
     notify "Pomodoro Complete!" "Time for a ${BREAK_MINS} minute break!"
     
     echo ""
-    echo -e "${YELLOW}Press Enter to start break, or Ctrl+C to exit${NC}"
-    read -r
+    echo -e "${YELLOW}Press Enter to start break, 'l' to show log, or Ctrl+C to exit${NC}"
+    read -r response
+    
+    if [ "$response" = "l" ]; then
+        clear
+        show_log
+        echo ""
+        echo -e "${YELLOW}Press Enter to continue...${NC}"
+        read -r
+    fi
     
     # Break session
     run_timer $BREAK_MINS "Break" "☕" "$GREEN"
     notify "Break Complete!" "Ready for another pomodoro?"
     
     echo ""
-    echo -e "${YELLOW}Press Enter to start next pomodoro, or Ctrl+C to exit${NC}"
-    read -r
+    echo -e "${YELLOW}Press Enter to start next pomodoro, 'l' to show log, or Ctrl+C to exit${NC}"
+    read -r response
+    
+    if [ "$response" = "l" ]; then
+        clear
+        show_log
+        echo ""
+        echo -e "${YELLOW}Press Enter to continue...${NC}"
+        read -r
+    fi
+    
+    clear
 done
