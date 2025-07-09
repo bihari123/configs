@@ -35,6 +35,15 @@ fi
 ln -sf "$SCRIPT_DIR/alacritty/alacritty.toml" "$HOME/.config/alacritty/alacritty.toml"
 echo -e "${GREEN}✓ Alacritty configuration linked${NC}"
 
+# Setup oh-my-posh configuration
+echo -e "${YELLOW}Setting up oh-my-posh configuration...${NC}"
+if [ -f "$HOME/.config/oh-my-posh-dark.omp.json" ]; then
+    echo "Backing up existing oh-my-posh-dark.omp.json to oh-my-posh-dark.omp.json.bak"
+    cp "$HOME/.config/oh-my-posh-dark.omp.json" "$HOME/.config/oh-my-posh-dark.omp.json.bak"
+fi
+ln -sf "$SCRIPT_DIR/oh-my-posh/dark-colorblind.omp.json" "$HOME/.config/oh-my-posh-dark.omp.json"
+echo -e "${GREEN}✓ Oh-my-posh configuration linked${NC}"
+
 # Setup bin directory and scripts
 echo -e "${YELLOW}Setting up scripts...${NC}"
 mkdir -p "$HOME/bin"
