@@ -52,8 +52,8 @@ x = 0
 y = 9999
 
 [window.padding]
-x = 20
-y = 20
+x = 0
+y = 0
 
 [cursor]
 style = { shape = "Block", blinking = "Off" }
