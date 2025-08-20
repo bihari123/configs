@@ -47,6 +47,10 @@ blur = true
 decorations = "Full"
 startup_mode = "Windowed"
 
+[window.position]
+x = 0
+y = 9999
+
 [window.padding]
 x = 20
 y = 20
@@ -61,3 +65,23 @@ text = '#0d1117'
 [colors.selection]
 background = '#3b5070'
 text = '#c9d1d9'
+
+[[keyboard.bindings]]
+key = "Equal"
+mods = "Control"
+action = "IncreaseFontSize"
+
+[[keyboard.bindings]]
+key = "NumpadAdd"
+mods = "Control"
+action = "IncreaseFontSize"
+
+[[keyboard.bindings]]
+key = "Minus"
+mods = "Control"
+action = "DecreaseFontSize"
+
+[[keyboard.bindings]]
+key = "Key0"
+mods = "Control"
+action = "ResetFontSize"
