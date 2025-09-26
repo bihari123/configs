@@ -1,0 +1,168 @@
+#!/bin/bash
+
+# Whisper Voice-to-Text Hotkey Service Terminal Shortcut
+# Usage: whisper [options]
+
+SCRIPT_PATH="$HOME/whisper-hotkey.py"
+CONFIGS_SCRIPT_PATH="$HOME/configs/whisper-voice-to-text/whisper-hotkey.py"
+
+# Function to show help
+show_help() {
+    echo "Whisper Voice-to-Text Hotkey Service"
+    echo "=================================="
+    echo ""
+    echo "Usage: whisper [options]"
+    echo ""
+    echo "Options:"
+    echo "  (no args)    Start the voice-to-text service"
+    echo "  -h, --help   Show this help message"
+    echo "  -i, --install Run the installation script"
+    echo "  -s, --status  Show service status"
+    echo "  -k, --kill   Stop any running whisper processes"
+    echo ""
+    echo "Hotkeys when running:"
+    echo "  Ctrl+Alt+R   Start recording"
+    echo "  Ctrl+Alt+S   Stop and transcribe"
+    echo "  Ctrl+C       Exit service"
+    echo ""
+}
+
+# Function to check and find script
+find_script() {
+    if [ -f "$SCRIPT_PATH" ]; then
+        echo "$SCRIPT_PATH"
+    elif [ -f "$CONFIGS_SCRIPT_PATH" ]; then
+        echo "$CONFIGS_SCRIPT_PATH"
+    else
+        echo "Error: Whisper script not found!"
+        echo "Expected locations:"
+        echo "  $SCRIPT_PATH"
+        echo "  $CONFIGS_SCRIPT_PATH"
+        echo ""
+        echo "Run: whisper --install"
+        exit 1
+    fi
+}
+
+# Function to run installation
+run_install() {
+    INSTALL_SCRIPT="$HOME/configs/whisper-voice-to-text/install.sh"
+    if [ -f "$INSTALL_SCRIPT" ]; then
+        echo "Running Whisper installation..."
+        cd "$HOME/configs/whisper-voice-to-text"
+        ./install.sh
+    else
+        echo "Error: Installation script not found at $INSTALL_SCRIPT"
+        echo "Please clone the configs repository first."
+        exit 1
+    fi
+}
+
+# Function to show status
+show_status() {
+    echo "Whisper Service Status:"
+    echo "======================"
+
+    # Check for running processes
+    PROCESSES=$(pgrep -f "whisper-hotkey" 2>/dev/null)
+    if [ -n "$PROCESSES" ]; then
+        echo "✅ Service is running (PID: $PROCESSES)"
+
+        # Show process details
+        ps aux | head -1
+        ps aux | grep -E "[w]hisper-hotkey"
+    else
+        echo "❌ Service is not running"
+    fi
+
+    echo ""
+
+    # Check script locations
+    echo "Script locations:"
+    if [ -f "$SCRIPT_PATH" ]; then
+        echo "✅ $SCRIPT_PATH"
+    else
+        echo "❌ $SCRIPT_PATH (not found)"
+    fi
+
+    if [ -f "$CONFIGS_SCRIPT_PATH" ]; then
+        echo "✅ $CONFIGS_SCRIPT_PATH"
+    else
+        echo "❌ $CONFIGS_SCRIPT_PATH (not found)"
+    fi
+
+    echo ""
+
+    # Check dependencies
+    echo "Dependencies:"
+    command -v python3 >/dev/null 2>&1 && echo "✅ python3" || echo "❌ python3"
+    command -v arecord >/dev/null 2>&1 && echo "✅ arecord" || echo "❌ arecord"
+    command -v xdotool >/dev/null 2>&1 && echo "✅ xdotool" || echo "❌ xdotool"
+
+    # Check whisper.cpp
+    if [ -d "$HOME/whisper.cpp" ]; then
+        if [ -f "$HOME/whisper.cpp/build/bin/whisper-cli" ]; then
+            echo "✅ whisper.cpp (built)"
+        else
+            echo "⚠️  whisper.cpp (not built)"
+        fi
+    else
+        echo "❌ whisper.cpp (not installed)"
+    fi
+}
+
+# Function to kill running processes
+kill_processes() {
+    echo "Stopping Whisper processes..."
+
+    PROCESSES=$(pgrep -f "whisper-hotkey" 2>/dev/null)
+    if [ -n "$PROCESSES" ]; then
+        echo "Found running processes: $PROCESSES"
+        pkill -f "whisper-hotkey"
+        sleep 1
+
+        # Check if still running
+        REMAINING=$(pgrep -f "whisper-hotkey" 2>/dev/null)
+        if [ -n "$REMAINING" ]; then
+            echo "Force killing remaining processes..."
+            pkill -9 -f "whisper-hotkey"
+        fi
+
+        echo "✅ Processes stopped"
+    else
+        echo "No running Whisper processes found"
+    fi
+}
+
+# Parse arguments
+case "$1" in
+    -h|--help)
+        show_help
+        exit 0
+        ;;
+    -i|--install)
+        run_install
+        exit 0
+        ;;
+    -s|--status)
+        show_status
+        exit 0
+        ;;
+    -k|--kill)
+        kill_processes
+        exit 0
+        ;;
+    "")
+        # No arguments, run the service
+        SCRIPT=$(find_script)
+        echo "Starting Whisper Voice-to-Text Service..."
+        echo "Press Ctrl+C to stop"
+        echo ""
+        python3 "$SCRIPT"
+        ;;
+    *)
+        echo "Unknown option: $1"
+        echo "Run 'whisper --help' for usage information"
+        exit 1
+        ;;
+esac
