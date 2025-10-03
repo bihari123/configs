@@ -42,14 +42,10 @@ cyan = '#56d4dd'
 white = '#f0f6fc'
 
 [window]
-opacity = 0.95
-blur = true
+opacity = 1.0
+blur = false
 decorations = "Full"
 startup_mode = "Windowed"
-
-[window.position]
-x = 0
-y = 9999
 
 [window.padding]
 x = 0
@@ -67,21 +63,15 @@ background = '#3b5070'
 text = '#c9d1d9'
 
 [[keyboard.bindings]]
-key = "Equal"
+key = "Return"
 mods = "Control"
-action = "IncreaseFontSize"
+chars = "\u001b[13;5u"
 
 [[keyboard.bindings]]
-key = "NumpadAdd"
-mods = "Control"
-action = "IncreaseFontSize"
+key = "Return"
+mods = "Shift"
+chars = "\u001b[13;2u"
 
 [[keyboard.bindings]]
-key = "Minus"
-mods = "Control"
-action = "DecreaseFontSize"
-
-[[keyboard.bindings]]
-key = "Key0"
-mods = "Control"
-action = "ResetFontSize"
+key = "F11"
+action = "ToggleFullscreen"
