@@ -1,0 +1,88 @@
+# ============================================================================
+# Ripgrep Configuration (~/.ripgreprc)
+# Default settings for ripgrep (rg) searches
+# ============================================================================
+
+# Search hidden files and directories
+--hidden
+
+# Follow symbolic links
+--follow
+
+# Smart case search (case-insensitive if all lowercase, case-sensitive if any uppercase)
+--smart-case
+
+# Exclude .git directories
+--glob=!.git/*
+
+# Exclude node_modules
+--glob=!node_modules/*
+
+# Exclude Python cache and virtual environments
+--glob=!__pycache__/*
+--glob=!*.pyc
+--glob=!.venv/*
+--glob=!venv/*
+--glob=!*.egg-info/*
+
+# Exclude Rust build artifacts
+--glob=!target/*
+--glob=!Cargo.lock
+
+# Exclude build directories
+--glob=!build/*
+--glob=!dist/*
+--glob=!.next/*
+--glob=!.nuxt/*
+
+# Exclude package manager files
+--glob=!package-lock.json
+--glob=!yarn.lock
+--glob=!pnpm-lock.yaml
+
+# Exclude IDE and editor files
+--glob=!.idea/*
+--glob=!.vscode/*
+--glob=!*.swp
+--glob=!*.swo
+--glob=!*~
+
+# Exclude OS files
+--glob=!.DS_Store
+--glob=!Thumbs.db
+
+# Exclude binary files
+--glob=!*.o
+--glob=!*.a
+--glob=!*.so
+--glob=!*.dylib
+--glob=!*.dll
+--glob=!*.exe
+
+# Exclude common archive types
+--glob=!*.zip
+--glob=!*.tar
+--glob=!*.tar.gz
+--glob=!*.tgz
+--glob=!*.rar
+--glob=!*.7z
+
+# Show line numbers by default
+--line-number
+
+# Use colors (auto-detect terminal capabilities)
+--colors=line:fg:yellow
+--colors=line:style:bold
+--colors=path:fg:green
+--colors=path:style:bold
+--colors=match:fg:red
+--colors=match:style:bold
+
+# Show column numbers
+--column
+
+# Max columns to display per match (prevent very long lines)
+--max-columns=150
+
+# Set max depth for directory traversal (0 = unlimited)
+--max-depth=0

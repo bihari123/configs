@@ -131,3 +131,82 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 export PATH="$HOME/bin:$PATH"
 export VCPKG_ROOT=~/vcpkg
+
+# ============================================================================
+# ENHANCED TERMINAL WORKFLOW
+# ============================================================================
+
+# Better History Settings
+HISTSIZE=50000
+HISTFILESIZE=100000
+HISTTIMEFORMAT="%F %T "
+shopt -s histverify
+HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"
+
+# Environment Variables
+export EDITOR=nvim
+export VISUAL=nvim
+export PAGER=less
+export LESS='-R -M --shift 5'
+
+# Man pages with bat (when installed)
+export MANPAGER="sh -c 'col -bx | bat -l man -p 2>/dev/null || less'"
+
+# Ripgrep config
+export RIPGREP_CONFIG_PATH=~/.ripgreprc
+
+# FZF Configuration
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_ALT_C_COMMAND='fd --type d --hidden --follow --exclude .git'
+
+# FZF color scheme (GitHub Dark to match terminal)
+export FZF_DEFAULT_OPTS="--color=bg+:#2d2d2d,bg:#0d1117,spinner:#3fb950,hl:#ff7b72 \
+--color=fg:#c9d1d9,header:#ff7b72,info:#d29922,pointer:#3fb950 \
+--color=marker:#3fb950,fg+:#c9d1d9,prompt:#58a6ff,hl+:#ff7b72 \
+--height 40% --layout=reverse --border --preview-window=right:60%"
+
+# Enable FZF keybindings (Ctrl+R for history, Ctrl+T for files, Alt+C for cd)
+if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
+    source /usr/share/doc/fzf/examples/key-bindings.bash
+fi
+
+# Enable FZF completion
+if [ -f /usr/share/doc/fzf/examples/completion.bash ]; then
+    source /usr/share/doc/fzf/examples/completion.bash
+fi
+
+# Zoxide (smart cd) - replaces cd with smart directory jumping
+eval "$(zoxide init bash --cmd cd)"
+
+# FZF Advanced Functions
+# ----------------------
+
+# frg - Search file contents with ripgrep and open in nvim
+frg() {
+  result=$(rg --ignore-case --color=always --line-number --no-heading "$@" |
+    fzf --ansi \
+        --color 'hl:-1:underline,hl+:-1:underline:reverse' \
+        --delimiter ':' \
+        --preview "bat --color=always {1} --highlight-line {2} 2>/dev/null || cat {1}" \
+        --preview-window 'up,60%,border-bottom,+{2}+3/3,~3')
+  file="${result%%:*}"
+  line="${result#*:}"
+  line="${line%%:*}"
+  [[ -n "$file" ]] && nvim "$file" "+${line}"
+}
+
+# zi - Interactive directory jumper with zoxide + fzf
+zi() {
+  local dir
+  dir=$(zoxide query -l 2>/dev/null | fzf --preview 'eza --tree --level=2 --color=always {} 2>/dev/null || ls -la {}') &&
+  cd "$dir"
+}
+
+# fkill - Interactive process killer
+fkill() {
+  pid=$(ps -ef | sed 1d | fzf -m | awk '{print $2}')
+  if [ "x$pid" != "x" ]; then
+    echo $pid | xargs kill -${1:-9}
+  fi
+}
