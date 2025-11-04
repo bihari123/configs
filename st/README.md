@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/suckless-large-logo.png" alt="st logo" width="600">
+</div>
+
 # st - simple terminal
 
 st is a simple terminal emulator for X which sucks less.

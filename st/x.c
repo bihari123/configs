@@ -19,6 +19,7 @@ char *argv0;
 #include "arg.h"
 #include "st.h"
 #include "win.h"
+#include "icon.h"
 
 /* types used in config.h */
 typedef struct {
@@ -93,7 +94,7 @@ typedef struct {
 	Window win;
 	Drawable buf;
 	GlyphFontSpec *specbuf; /* font spec buffer used for rendering */
-	Atom xembed, wmdeletewin, netwmname, netwmiconname, netwmpid;
+	Atom xembed, wmdeletewin, netwmname, netwmiconname, netwmicon, netwmpid;
 	struct {
 		XIM xim;
 		XIC xic;
@@ -686,6 +687,7 @@ setsel(char *str, Time t)
 	XSetSelectionOwner(xw.dpy, XA_PRIMARY, xw.win, t);
 	if (XGetSelectionOwner(xw.dpy, XA_PRIMARY) != xw.win)
 		selclear();
+	clipcopy(NULL);
 }
 
 void
@@ -1218,11 +1220,16 @@ xinit(int cols, int rows)
 	xw.wmdeletewin = XInternAtom(xw.dpy, "WM_DELETE_WINDOW", False);
 	xw.netwmname = XInternAtom(xw.dpy, "_NET_WM_NAME", False);
 	xw.netwmiconname = XInternAtom(xw.dpy, "_NET_WM_ICON_NAME", False);
+	xw.netwmicon = XInternAtom(xw.dpy, "_NET_WM_ICON", False);
 	XSetWMProtocols(xw.dpy, xw.win, &xw.wmdeletewin, 1);
 
 	xw.netwmpid = XInternAtom(xw.dpy, "_NET_WM_PID", False);
 	XChangeProperty(xw.dpy, xw.win, xw.netwmpid, XA_CARDINAL, 32,
 			PropModeReplace, (uchar *)&thispid, 1);
+
+	/* Set window icon */
+	XChangeProperty(xw.dpy, xw.win, xw.netwmicon, XA_CARDINAL, 32,
+			PropModeReplace, (uchar *)icon_data, ICON_DATA_LENGTH);
 
 	win.mode = MODE_NUMLOCK;
 	resettitle();
