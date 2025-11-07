@@ -10,15 +10,21 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
     session_list=""
     for session in "${sessions[@]}"; do
         if [ "$session" = "$current_session" ]; then
-            session_list+="* $session (current)\n"
+            session_list+="→ Switch: $session (current)\n"
         else
-            session_list+="  $session\n"
+            session_list+="→ Switch: $session\n"
         fi
     done
-    session_list+="+ Create new session\n"
+    session_list+="\n"
+    for session in "${sessions[@]}"; do
+        if [ "$session" != "$current_session" ]; then
+            session_list+="✗ Delete: $session\n"
+        fi
+    done
+    session_list+="\n+ Create new session\n"
 
     # Use fzf for selection
-    selected=$(echo -e "$session_list" | fzf --height=100% --reverse --prompt="Select session: " --header="TMUX SESSION SELECTOR" --no-info)
+    selected=$(echo -e "$session_list" | fzf --height=100% --reverse --prompt="Select action: " --header="TMUX SESSION MANAGER" --no-info)
 
     if [ -z "$selected" ]; then
         exit 0
@@ -34,9 +40,29 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
         exit 0
     fi
 
-    # Extract session name (remove leading * or spaces and (current) suffix)
-    session_name=$(echo "$selected" | sed 's/^[* ]*//; s/ (current)$//')
-    tmux switch-client -t "$session_name"
+    # Handle delete
+    if [[ "$selected" =~ ^"✗ Delete: " ]]; then
+        session_name=$(echo "$selected" | sed 's/^✗ Delete: //')
+        # Confirm deletion
+        confirm=$(echo -e "No\nYes" | fzf --height=40% --reverse --prompt="Delete '$session_name'? " --header="CONFIRM DELETION")
+        if [ "$confirm" = "Yes" ]; then
+            tmux kill-session -t "$session_name"
+            # Reopen menu
+            exec "$0"
+        else
+            # Reopen menu
+            exec "$0"
+        fi
+        exit 0
+    fi
+
+    # Handle switch (remove prefix and (current) suffix)
+    if [[ "$selected" =~ ^"→ Switch: " ]]; then
+        session_name=$(echo "$selected" | sed 's/^→ Switch: //; s/ (current)$//')
+        tmux switch-client -t "$session_name"
+        exit 0
+    fi
+
     exit 0
 fi
 
@@ -62,6 +88,7 @@ if [ ${#sessions[@]} -gt 0 ]; then
 fi
 
 echo "║  N) Create new session                     ║"
+echo "║  D) Delete session                         ║"
 echo "║  Q) Close this menu                        ║"
 echo "╚════════════════════════════════════════════╝"
 echo ""
@@ -80,6 +107,37 @@ if [[ "$choice" =~ ^[Nn]$ ]]; then
         tmux switch-client -t "$session_name"
     fi
     exit 0
+fi
+
+# Handle delete session
+if [[ "$choice" =~ ^[Dd]$ ]]; then
+    if [ ${#sessions[@]} -eq 0 ]; then
+        echo "No sessions to delete."
+        sleep 1
+        exec "$0"
+    fi
+
+    echo ""
+    read -p "Enter session number to delete: " del_choice
+
+    if [[ "$del_choice" =~ ^[0-9]+$ ]] && [ "$del_choice" -ge 1 ] && [ "$del_choice" -le "${#sessions[@]}" ]; then
+        session_to_delete="${sessions[$((del_choice-1))]}"
+
+        # Don't allow deleting current session
+        if [ "$session_to_delete" = "$current_session" ]; then
+            echo "Cannot delete current session. Switch to another session first."
+            sleep 2
+            exec "$0"
+        fi
+
+        read -p "Delete session '$session_to_delete'? (y/N): " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            tmux kill-session -t "$session_to_delete"
+            echo "Session '$session_to_delete' deleted."
+            sleep 1
+        fi
+    fi
+    exec "$0"
 fi
 
 # Handle session selection by number
