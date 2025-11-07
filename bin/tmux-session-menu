@@ -59,7 +59,16 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
     # Handle switch (remove prefix and (current) suffix)
     if [[ "$selected" =~ ^"→ Switch: " ]]; then
         session_name=$(echo "$selected" | sed 's/^→ Switch: //; s/ (current)$//')
-        tmux switch-client -t "$session_name"
+
+        # If switching to current session with default numeric name, prompt to rename
+        if [ "$session_name" = "$current_session" ] && [[ "$session_name" =~ ^[0-9]+$ ]]; then
+            new_name=$(echo "" | fzf --print-query --prompt="Rename session '$session_name' to: " --header="RENAME CURRENT SESSION" | tail -1)
+            if [ -n "$new_name" ] && [ "$new_name" != "$session_name" ]; then
+                tmux rename-session -t "$session_name" "$new_name"
+            fi
+        else
+            tmux switch-client -t "$session_name"
+        fi
         exit 0
     fi
 
@@ -143,7 +152,16 @@ fi
 # Handle session selection by number
 if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#sessions[@]}" ]; then
     selected_session="${sessions[$((choice-1))]}"
-    tmux switch-client -t "$selected_session"
+
+    # If selecting current session with default numeric name, prompt to rename
+    if [ "$selected_session" = "$current_session" ] && [[ "$selected_session" =~ ^[0-9]+$ ]]; then
+        read -p "Rename session '$selected_session' to: " new_name
+        if [ -n "$new_name" ] && [ "$new_name" != "$selected_session" ]; then
+            tmux rename-session -t "$selected_session" "$new_name"
+        fi
+    else
+        tmux switch-client -t "$selected_session"
+    fi
     exit 0
 fi
 
