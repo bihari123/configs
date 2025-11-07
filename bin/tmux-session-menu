@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Get list of existing sessions
+sessions=($(tmux list-sessions -F '#S' 2>/dev/null))
+current_session=$(tmux display-message -p '#S')
+
+# Build the menu
+echo "╔════════════════════════════════════════════╗"
+echo "║       TMUX SESSION SELECTOR               ║"
+echo "╠════════════════════════════════════════════╣"
+
+if [ ${#sessions[@]} -gt 0 ]; then
+    echo "║ Existing Sessions:                        ║"
+    i=1
+    for session in "${sessions[@]}"; do
+        if [ "$session" = "$current_session" ]; then
+            printf "║  %2d) %-34s * ║\n" "$i" "$session"
+        else
+            printf "║  %2d) %-36s ║\n" "$i" "$session"
+        fi
+        ((i++))
+    done
+    echo "║                                            ║"
+fi
+
+echo "║  N) Create new session                     ║"
+echo "║  Q) Close this menu                        ║"
+echo "╚════════════════════════════════════════════╝"
+echo ""
+read -p "Select option: " choice
+
+# Handle quit
+if [[ "$choice" =~ ^[Qq]$ ]]; then
+    exit 0
+fi
+
+# Handle new session
+if [[ "$choice" =~ ^[Nn]$ ]]; then
+    read -p "Enter new session name: " session_name
+    if [ -n "$session_name" ]; then
+        tmux new-session -d -s "$session_name"
+        tmux switch-client -t "$session_name"
+    fi
+    exit 0
+fi
+
+# Handle session selection by number
+if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#sessions[@]}" ]; then
+    selected_session="${sessions[$((choice-1))]}"
+    tmux switch-client -t "$selected_session"
+    exit 0
+fi
+
+echo "Invalid selection."
+sleep 1
