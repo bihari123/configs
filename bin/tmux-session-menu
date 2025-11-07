@@ -4,13 +4,51 @@
 sessions=($(tmux list-sessions -F '#S' 2>/dev/null))
 current_session=$(tmux display-message -p '#S')
 
-# Build the menu
+# Check if fzf is available for better scrolling experience
+if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
+    # Build session list for fzf
+    session_list=""
+    for session in "${sessions[@]}"; do
+        if [ "$session" = "$current_session" ]; then
+            session_list+="* $session (current)\n"
+        else
+            session_list+="  $session\n"
+        fi
+    done
+    session_list+="+ Create new session\n"
+
+    # Use fzf for selection
+    selected=$(echo -e "$session_list" | fzf --height=100% --reverse --prompt="Select session: " --header="TMUX SESSION SELECTOR" --no-info)
+
+    if [ -z "$selected" ]; then
+        exit 0
+    fi
+
+    # Handle new session
+    if [[ "$selected" == "+ Create new session" ]]; then
+        session_name=$(echo "" | fzf --print-query --prompt="Enter session name: " --header="CREATE NEW SESSION" | tail -1)
+        if [ -n "$session_name" ]; then
+            tmux new-session -d -s "$session_name"
+            tmux switch-client -t "$session_name"
+        fi
+        exit 0
+    fi
+
+    # Extract session name (remove leading * or spaces and (current) suffix)
+    session_name=$(echo "$selected" | sed 's/^[* ]*//; s/ (current)$//')
+    tmux switch-client -t "$session_name"
+    exit 0
+fi
+
+# Fallback to scrollable numbered menu
+clear
 echo "╔════════════════════════════════════════════╗"
 echo "║       TMUX SESSION SELECTOR               ║"
 echo "╠════════════════════════════════════════════╣"
 
 if [ ${#sessions[@]} -gt 0 ]; then
-    echo "║ Existing Sessions:                        ║"
+    echo "║ Existing Sessions: (scroll with ↑↓)      ║"
+    echo "╠════════════════════════════════════════════╣"
     i=1
     for session in "${sessions[@]}"; do
         if [ "$session" = "$current_session" ]; then
@@ -20,7 +58,7 @@ if [ ${#sessions[@]} -gt 0 ]; then
         fi
         ((i++))
     done
-    echo "║                                            ║"
+    echo "╠════════════════════════════════════════════╣"
 fi
 
 echo "║  N) Create new session                     ║"
