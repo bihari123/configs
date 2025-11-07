@@ -65,6 +65,8 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
             new_name=$(echo "" | fzf --print-query --prompt="Rename session '$session_name' to: " --header="RENAME CURRENT SESSION" | tail -1)
             if [ -n "$new_name" ] && [ "$new_name" != "$session_name" ]; then
                 tmux rename-session -t "$session_name" "$new_name"
+                # Save session immediately after rename
+                ~/.tmux/plugins/tmux-resurrect/scripts/save.sh >/dev/null 2>&1 &
             fi
         else
             tmux switch-client -t "$session_name"
@@ -158,6 +160,8 @@ if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#ses
         read -p "Rename session '$selected_session' to: " new_name
         if [ -n "$new_name" ] && [ "$new_name" != "$selected_session" ]; then
             tmux rename-session -t "$selected_session" "$new_name"
+            # Save session immediately after rename
+            ~/.tmux/plugins/tmux-resurrect/scripts/save.sh >/dev/null 2>&1 &
         fi
     else
         tmux switch-client -t "$selected_session"
