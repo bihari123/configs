@@ -39,21 +39,25 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
 
     # Handle new session
     if [[ "$selected" == "+ Create new session" ]]; then
-        session_name=$(echo "" | fzf --print-query --prompt="Enter session name: " --header="CREATE NEW SESSION" | tail -1)
-        if [ -n "$session_name" ]; then
-            # Ask if session should be persistent or temporary
-            session_type=$(echo -e "Persistent (saved)\nTemporary (not saved)" | fzf --height=40% --reverse --prompt="Session type: " --header="SELECT SESSION TYPE")
+        # Ask session type first
+        session_type=$(echo -e "Persistent (saved)\nTemporary (not saved)" | fzf --height=40% --reverse --prompt="Session type: " --header="SELECT SESSION TYPE")
 
-            tmux new-session -d -s "$session_name"
-
-            # Set persistence flag
+        if [ -n "$session_type" ]; then
             if [[ "$session_type" == "Temporary (not saved)" ]]; then
-                tmux set-option -t "$session_name" @session-persistent "false"
+                # Temporary session - auto-generate name
+                tmux new-session -d
+                new_session=$(tmux display-message -p '#S')
+                tmux set-option -t "$new_session" @session-persistent "false"
+                tmux switch-client -t "$new_session"
             else
-                tmux set-option -t "$session_name" @session-persistent "true"
+                # Persistent session - ask for name
+                session_name=$(echo "" | fzf --print-query --prompt="Enter session name: " --header="CREATE PERSISTENT SESSION" | tail -1)
+                if [ -n "$session_name" ]; then
+                    tmux new-session -d -s "$session_name"
+                    tmux set-option -t "$session_name" @session-persistent "true"
+                    tmux switch-client -t "$session_name"
+                fi
             fi
-
-            tmux switch-client -t "$session_name"
         fi
         exit 0
     fi
@@ -130,23 +134,27 @@ fi
 
 # Handle new session
 if [[ "$choice" =~ ^[Nn]$ ]]; then
-    read -p "Enter new session name: " session_name
-    if [ -n "$session_name" ]; then
-        read -p "Persistent (P) or Temporary (T)? [P/t]: " session_type
+    # Ask session type first
+    read -p "Persistent (P) or Temporary (T)? [P/t]: " session_type
 
-        tmux new-session -d -s "$session_name"
-
-        # Set persistence flag (default to persistent)
-        if [[ "$session_type" =~ ^[Tt]$ ]]; then
-            tmux set-option -t "$session_name" @session-persistent "false"
-            echo "Created temporary session (not saved)"
-        else
-            tmux set-option -t "$session_name" @session-persistent "true"
-            echo "Created persistent session (will be saved)"
-        fi
+    if [[ "$session_type" =~ ^[Tt]$ ]]; then
+        # Temporary session - auto-generate name
+        tmux new-session -d
+        new_session=$(tmux display-message -p '#S')
+        tmux set-option -t "$new_session" @session-persistent "false"
+        echo "Created temporary session: $new_session (not saved)"
         sleep 1
-
-        tmux switch-client -t "$session_name"
+        tmux switch-client -t "$new_session"
+    else
+        # Persistent session - ask for name
+        read -p "Enter session name: " session_name
+        if [ -n "$session_name" ]; then
+            tmux new-session -d -s "$session_name"
+            tmux set-option -t "$session_name" @session-persistent "true"
+            echo "Created persistent session: $session_name (will be saved)"
+            sleep 1
+            tmux switch-client -t "$session_name"
+        fi
     fi
     exit 0
 fi
