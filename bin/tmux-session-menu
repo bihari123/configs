@@ -28,6 +28,7 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
             session_list+="✗ Delete: $session\n"
         fi
     done
+    session_list+="\n✗ Delete ALL other sessions (keep current)\n"
     session_list+="\n+ Create new session (persistent)\n"
     session_list+="+ Create temporary session\n"
     session_list+="⟳ Create persistent and delete current\n"
@@ -81,6 +82,36 @@ if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
         tmux set-option -t "$new_session" @session-persistent "false"
         tmux switch-client -t "$new_session"
         tmux kill-session -t "$old_session"
+        exit 0
+    fi
+
+    # Handle delete all other sessions
+    if [[ "$selected" =~ ^"✗ Delete ALL other sessions" ]]; then
+        # Confirm deletion
+        current=$(tmux display-message -p '#S')
+        other_sessions=()
+        while IFS= read -r session; do
+            if [ "$session" != "$current" ]; then
+                other_sessions+=("$session")
+            fi
+        done < <(tmux list-sessions -F '#{session_name}')
+
+        if [ ${#other_sessions[@]} -eq 0 ]; then
+            echo "No other sessions to delete."
+            sleep 1
+            exec "$0"
+        fi
+        confirm=$(echo -e "No\nYes" | fzf --height=40% --reverse --prompt="Delete ${#other_sessions[@]} other session(s)? " --header="CONFIRM DELETE ALL")
+        if [ "$confirm" = "Yes" ]; then
+            for sess in "${other_sessions[@]}"; do
+                tmux kill-session -t "$sess"
+            done
+            # Reopen menu
+            exec "$0"
+        else
+            # Reopen menu
+            exec "$0"
+        fi
         exit 0
     fi
 
@@ -147,6 +178,7 @@ echo "║  T) Create temporary session               ║"
 echo "║  P) Create persistent & delete current     ║"
 echo "║  X) Create temporary & delete current      ║"
 echo "║  D) Delete session                         ║"
+echo "║  K) Kill all other sessions (keep current) ║"
 echo "║  Q) Close this menu                        ║"
 echo "╚════════════════════════════════════════════╝"
 echo ""
@@ -238,6 +270,39 @@ if [[ "$choice" =~ ^[Dd]$ ]]; then
             echo "Session '$session_to_delete' deleted."
             sleep 1
         fi
+    fi
+    exec "$0"
+fi
+
+# Handle kill all other sessions
+if [[ "$choice" =~ ^[Kk]$ ]]; then
+    current=$(tmux display-message -p '#S')
+    other_sessions=()
+    while IFS= read -r session; do
+        if [ "$session" != "$current" ]; then
+            other_sessions+=("$session")
+        fi
+    done < <(tmux list-sessions -F '#{session_name}')
+
+    if [ ${#other_sessions[@]} -eq 0 ]; then
+        echo "No other sessions to delete."
+        sleep 2
+        exec "$0"
+    fi
+
+    echo ""
+    echo "Other sessions:"
+    for sess in "${other_sessions[@]}"; do
+        echo "  - $sess"
+    done
+    echo ""
+    read -p "Delete all ${#other_sessions[@]} other session(s)? (y/N): " confirm
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        for sess in "${other_sessions[@]}"; do
+            tmux kill-session -t "$sess"
+        done
+        echo "All other sessions deleted."
+        sleep 1
     fi
     exec "$0"
 fi

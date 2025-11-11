@@ -121,7 +121,7 @@ export PATH=$PATH:/home/tarun/.local/bin
 # Start prompt at the bottom of terminal
 printf '\033[2J\033[999B'
 
-eval "$(oh-my-posh init bash --config ~/.config/oh-my-posh-dark-colorblind.omp.json)"
+#eval "$(oh-my-posh init bash --config ~/.config/oh-my-posh-dark-colorblind.omp.json)"
 
 #eval "$(starship init bash)"
 . "$HOME/.cargo/env"

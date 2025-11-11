@@ -21,7 +21,7 @@ family = "FiraCode Nerd Font"
 style = "Bold Italic"
 
 [colors.primary]
-background = '#0d1117'
+background = '#000000'
 foreground = '#c9d1d9'
 
 [colors.normal]
