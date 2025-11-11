@@ -1,0 +1,25 @@
+#!/bin/bash
+# Wrapper for tmux-resurrect save that only saves persistent sessions
+
+# Path to the actual resurrect save script
+RESURRECT_SAVE="$HOME/.tmux/plugins/tmux-resurrect/scripts/save.sh"
+
+# Check if resurrect save script exists
+if [ ! -f "$RESURRECT_SAVE" ]; then
+    exit 0
+fi
+
+# Get current session name
+current_session=$(tmux display-message -p '#S' 2>/dev/null)
+
+if [ -z "$current_session" ]; then
+    exit 0
+fi
+
+# Check if session is marked as persistent (default to persistent for backward compatibility)
+is_persistent=$(tmux show-options -t "$current_session" -v @session-persistent 2>/dev/null || echo "true")
+
+# Only save if session is persistent
+if [ "$is_persistent" = "true" ]; then
+    exec "$RESURRECT_SAVE"
+fi
