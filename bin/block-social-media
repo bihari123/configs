@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""
+Social Media Blocker Script
+Blocks/unblocks social media sites by modifying the hosts file.
+Requires administrator/root privileges to run.
+"""
+
+import os
+import sys
+import platform
+import subprocess
+
+# List of social media sites to block
+SOCIAL_MEDIA_SITES = [
+    "www.facebook.com",
+    "facebook.com",
+    "www.instagram.com",
+    "instagram.com",
+    "www.twitter.com",
+    "twitter.com",
+    "www.x.com",
+    "x.com",
+    "www.tiktok.com",
+    "tiktok.com",
+    "www.reddit.com",
+    "reddit.com",
+    "www.snapchat.com",
+    "snapchat.com",
+    "www.linkedin.com",
+    "linkedin.com",
+    "www.pinterest.com",
+    "pinterest.com",
+    "www.youtube.com",
+    "youtube.com",
+    "www.twitch.tv",
+    "twitch.tv",
+    "www.threads.net",
+    "threads.net",
+]
+
+# Determine hosts file path based on OS
+def get_hosts_path():
+    system = platform.system()
+    if system == "Windows":
+        return r"C:\Windows\System32\drivers\etc\hosts"
+    else:  # Linux, macOS
+        return "/etc/hosts"
+
+# Check if running with admin privileges
+def is_admin():
+    try:
+        if platform.system() == "Windows":
+            import ctypes
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        else:
+            return os.geteuid() == 0
+    except:
+        return False
+
+# Flush DNS cache
+def flush_dns_cache():
+    system = platform.system()
+    print("\nFlushing DNS cache...")
+
+    try:
+        if system == "Windows":
+            subprocess.run(["ipconfig", "/flushdns"], check=True, capture_output=True)
+            print("DNS cache flushed successfully!")
+        elif system == "Darwin":  # macOS
+            subprocess.run(["dscacheutil", "-flushcache"], check=True, capture_output=True)
+            subprocess.run(["killall", "-HUP", "mDNSResponder"], check=False, capture_output=True)
+            print("DNS cache flushed successfully!")
+        else:  # Linux
+            flushed = False
+
+            # Try systemd-resolved (Ubuntu 18.04+, most modern systems)
+            commands_to_try = [
+                ["resolvectl", "flush-caches"],
+                ["systemd-resolve", "--flush-caches"],
+                ["systemctl", "restart", "systemd-resolved"],
+                ["systemctl", "restart", "nscd"],
+                ["systemctl", "restart", "dnsmasq"]
+            ]
+
+            for cmd in commands_to_try:
+                try:
+                    result = subprocess.run(cmd, check=True, capture_output=True, timeout=5)
+                    print(f"DNS cache flushed successfully using {cmd[0]}!")
+                    flushed = True
+                    break
+                except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+                    continue
+
+            if not flushed:
+                print("Could not automatically flush DNS cache.")
+                print("You may need to restart your browser or manually flush DNS.")
+
+    except Exception as e:
+        print(f"Warning: Could not flush DNS cache: {e}")
+        print("You may need to restart your browser for changes to take effect.")
+
+# Block social media sites
+def block_sites():
+    hosts_path = get_hosts_path()
+    redirect_ip = "127.0.0.1"
+
+    try:
+        # Read current hosts file
+        with open(hosts_path, 'r') as file:
+            content = file.read()
+
+        # Check if already blocked
+        if "# Social Media Blocker - START" in content:
+            print("Social media sites are already blocked!")
+            return
+
+        # Add blocking entries
+        with open(hosts_path, 'a') as file:
+            file.write("\n# Social Media Blocker - START\n")
+            for site in SOCIAL_MEDIA_SITES:
+                file.write(f"{redirect_ip} {site}\n")
+            file.write("# Social Media Blocker - END\n")
+
+        print("Successfully blocked social media sites!")
+        print(f"Blocked {len(SOCIAL_MEDIA_SITES)} domains.")
+
+        # Flush DNS cache to make changes take effect immediately
+        flush_dns_cache()
+
+        print("\nIMPORTANT: Please close any open social media tabs in your browser.")
+        print("Already open tabs will continue to work until you close them.")
+
+    except PermissionError:
+        print("ERROR: Permission denied. Please run this script with administrator/root privileges.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+# Unblock social media sites
+def unblock_sites():
+    hosts_path = get_hosts_path()
+
+    try:
+        # Read current hosts file
+        with open(hosts_path, 'r') as file:
+            lines = file.readlines()
+
+        # Remove blocking entries
+        new_lines = []
+        skip = False
+
+        for line in lines:
+            if "# Social Media Blocker - START" in line:
+                skip = True
+                continue
+            elif "# Social Media Blocker - END" in line:
+                skip = False
+                continue
+
+            if not skip:
+                new_lines.append(line)
+
+        # Write back to hosts file
+        with open(hosts_path, 'w') as file:
+            file.writelines(new_lines)
+
+        print("Successfully unblocked social media sites!")
+
+        # Flush DNS cache to make changes take effect immediately
+        flush_dns_cache()
+
+    except PermissionError:
+        print("ERROR: Permission denied. Please run this script with administrator/root privileges.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+# Display current status
+def show_status():
+    hosts_path = get_hosts_path()
+
+    try:
+        with open(hosts_path, 'r') as file:
+            content = file.read()
+
+        if "# Social Media Blocker - START" in content:
+            print("Status: Social media sites are BLOCKED")
+        else:
+            print("Status: Social media sites are NOT BLOCKED")
+
+    except Exception as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+
+# Main function
+def main():
+    print("=" * 50)
+    print("Social Media Blocker")
+    print("=" * 50)
+
+    if not is_admin():
+        print("\nWARNING: This script requires administrator/root privileges.")
+        if platform.system() == "Windows":
+            print("Please run as Administrator.")
+        else:
+            print("Please run with sudo: sudo python3 block_social_media.py")
+        print()
+
+    if len(sys.argv) < 2:
+        print("\nUsage:")
+        print("  Block sites:   python3 block_social_media.py block")
+        print("  Unblock sites: python3 block_social_media.py unblock")
+        print("  Show status:   python3 block_social_media.py status")
+        sys.exit(0)
+
+    command = sys.argv[1].lower()
+
+    if command == "block":
+        block_sites()
+    elif command == "unblock":
+        unblock_sites()
+    elif command == "status":
+        show_status()
+    else:
+        print(f"Unknown command: {command}")
+        print("Use 'block', 'unblock', or 'status'")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
