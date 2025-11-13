@@ -1,0 +1,6 @@
+# Binaries
+lazygit
+*.tar.gz
+
+# Logs
+*.log
