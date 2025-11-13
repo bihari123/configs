@@ -4,3 +4,7 @@ lazygit
 
 # Logs
 *.log
+
+# Rust/Cargo
+taskquest/target/
+taskquest/Cargo.lock
