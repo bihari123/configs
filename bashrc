@@ -117,7 +117,7 @@ if ! shopt -oq posix; then
 fi
 export PATH=$PATH:/usr/local/go/bin
 export PATH=$PATH:/home/tarun/.local/bin
-
+export PATH=$PATH:$HOME/go/bin
 # Start prompt at the bottom of terminal
 printf '\033[2J\033[999B'
 
@@ -210,3 +210,4 @@ fkill() {
     echo $pid | xargs kill -${1:-9}
   fi
 }
+
