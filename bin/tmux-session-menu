@@ -4,40 +4,80 @@
 sessions=($(tmux list-sessions -F '#S' 2>/dev/null))
 current_session=$(tmux display-message -p '#S')
 
-# Check if fzf is available for better scrolling experience
-if command -v fzf &> /dev/null && [ ${#sessions[@]} -gt 0 ]; then
-    # Build session list for fzf
+# Check if sesh and fzf are available
+if command -v sesh &> /dev/null && command -v fzf &> /dev/null; then
+    # Build session list using sesh for discovery
     session_list=""
-    for session in "${sessions[@]}"; do
-        # Check if session is persistent
-        is_persistent=$(tmux show-options -t "$session" -v @session-persistent 2>/dev/null || echo "true")
-        type_label="[P]"
-        if [ "$is_persistent" = "false" ]; then
-            type_label="[T]"
-        fi
 
-        if [ "$session" = "$current_session" ]; then
-            session_list+="→ Switch: $session $type_label (current)\n"
+    # Get sesh suggestions (tmux sessions + zoxide directories)
+    while IFS= read -r item; do
+        # Check if this is an existing tmux session
+        is_tmux_session=false
+        for session in "${sessions[@]}"; do
+            if [ "$item" = "$session" ]; then
+                is_tmux_session=true
+                break
+            fi
+        done
+
+        if [ "$is_tmux_session" = true ]; then
+            # Check if session is persistent
+            is_persistent=$(tmux show-options -t "$item" -v @session-persistent 2>/dev/null || echo "true")
+            type_label="[P]"
+            if [ "$is_persistent" = "false" ]; then
+                type_label="[T]"
+            fi
+
+            if [ "$item" = "$current_session" ]; then
+                session_list+="→ Switch: $item $type_label (current)\n"
+            else
+                session_list+="→ Switch: $item $type_label\n"
+            fi
         else
-            session_list+="→ Switch: $session $type_label\n"
+            # This is a zoxide directory or other sesh suggestion
+            session_list+="📁 New from: $item\n"
         fi
-    done
-    session_list+="\n"
-    for session in "${sessions[@]}"; do
-        if [ "$session" != "$current_session" ]; then
-            session_list+="✗ Delete: $session\n"
-        fi
-    done
-    session_list+="\n✗ Delete ALL other sessions (keep current)\n"
+    done < <(sesh list -t -z 2>/dev/null)
+
+    # Add delete options for existing sessions
+    if [ ${#sessions[@]} -gt 0 ]; then
+        session_list+="\n"
+        for session in "${sessions[@]}"; do
+            if [ "$session" != "$current_session" ]; then
+                session_list+="✗ Delete: $session\n"
+            fi
+        done
+        session_list+="\n✗ Delete ALL other sessions (keep current)\n"
+    fi
+
+    # Add creation options
     session_list+="\n+ Create new session (persistent)\n"
     session_list+="+ Create temporary session\n"
     session_list+="⟳ Create persistent and delete current\n"
     session_list+="⟳ Create temporary and delete current\n"
 
     # Use fzf for selection
-    selected=$(echo -e "$session_list" | fzf --height=100% --reverse --prompt="Select action: " --header="TMUX SESSION MANAGER" --no-info)
+    selected=$(echo -e "$session_list" | fzf --height=100% --reverse --prompt="Select action: " --header="TMUX SESSION MANAGER (powered by sesh)" --no-info)
 
     if [ -z "$selected" ]; then
+        exit 0
+    fi
+
+    # Handle new session from directory (sesh zoxide/directory suggestions)
+    if [[ "$selected" =~ ^"📁 New from: " ]]; then
+        dir_path=$(echo "$selected" | sed 's/^📁 New from: //')
+        # Create session name from directory name
+        session_name=$(basename "$dir_path" | tr . _)
+
+        # Check if session already exists
+        if tmux has-session -t "$session_name" 2>/dev/null; then
+            tmux switch-client -t "$session_name"
+        else
+            # Create new persistent session and cd to directory
+            tmux new-session -d -s "$session_name" -c "$dir_path"
+            tmux set-option -t "$session_name" @session-persistent "true"
+            tmux switch-client -t "$session_name"
+        fi
         exit 0
     fi
 

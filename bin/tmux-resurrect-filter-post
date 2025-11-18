@@ -1,0 +1,51 @@
+#!/bin/bash
+# Post-save hook that filters temporary sessions from resurrect save file
+# This runs automatically after every save (continuum auto-save or manual save)
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+
+# Find the last saved file (passed as argument from resurrect, or find it)
+if [ -n "$1" ]; then
+    LAST_SAVE="$1"
+else
+    LAST_SAVE=$(ls -t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null | head -1)
+fi
+
+if [ -z "$LAST_SAVE" ] || [ ! -f "$LAST_SAVE" ]; then
+    exit 0
+fi
+
+# Create temporary file for filtered content
+TEMP_FILE="${LAST_SAVE}.tmp"
+> "$TEMP_FILE"  # Create empty file
+
+# Filter out temporary sessions
+while IFS= read -r line; do
+    # Check if this is a pane or window line
+    if [[ "$line" =~ ^(pane|window)[[:space:]] ]]; then
+        # Extract session name (second field, tab-delimited)
+        session_name=$(echo "$line" | awk -F'\t' '{print $2}')
+
+        # Check if session exists and is persistent
+        if tmux has-session -t "$session_name" 2>/dev/null; then
+            is_persistent=$(tmux show-options -t "$session_name" -v @session-persistent 2>/dev/null || echo "true")
+
+            # Only include if persistent (default to persistent for backward compatibility)
+            if [ "$is_persistent" = "true" ]; then
+                echo "$line" >> "$TEMP_FILE"
+            fi
+        else
+            # Session doesn't exist anymore, include it (might have been closed)
+            # Default to persistent for backward compatibility
+            echo "$line" >> "$TEMP_FILE"
+        fi
+    else
+        # State line or other metadata, keep it
+        echo "$line" >> "$TEMP_FILE"
+    fi
+done < "$LAST_SAVE"
+
+# Replace original file with filtered version
+if [ -f "$TEMP_FILE" ]; then
+    mv "$TEMP_FILE" "$LAST_SAVE"
+fi

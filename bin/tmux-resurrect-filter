@@ -1,0 +1,58 @@
+#!/bin/bash
+# Smart resurrect save that filters temporary sessions
+# This wrapper allows both continuum auto-saves and hook-based saves
+# while only persisting sessions marked as persistent
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+RESURRECT_SAVE="$HOME/.tmux/plugins/tmux-resurrect/scripts/save.sh"
+
+# Check if resurrect save script exists
+if [ ! -f "$RESURRECT_SAVE" ]; then
+    exit 0
+fi
+
+# Run the normal resurrect save
+"$RESURRECT_SAVE"
+
+# Wait a moment for the save to complete
+sleep 0.1
+
+# Find the last saved file
+LAST_SAVE=$(ls -t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null | head -1)
+
+if [ -z "$LAST_SAVE" ] || [ ! -f "$LAST_SAVE" ]; then
+    exit 0
+fi
+
+# Create temporary file for filtered content
+TEMP_FILE="${LAST_SAVE}.tmp"
+
+# Filter out temporary sessions
+while IFS= read -r line; do
+    # Check if this is a session line (starts with "pane" or "window")
+    if [[ "$line" =~ ^(pane|window)[[:space:]] ]]; then
+        # Extract session name (field after tab delimiter)
+        session_name=$(echo "$line" | awk -F'\t' '{print $2}')
+
+        # Check if session exists and is persistent
+        if tmux has-session -t "$session_name" 2>/dev/null; then
+            is_persistent=$(tmux show-options -t "$session_name" -v @session-persistent 2>/dev/null || echo "true")
+
+            # Only include if persistent (default to persistent for backward compatibility)
+            if [ "$is_persistent" = "true" ]; then
+                echo "$line" >> "$TEMP_FILE"
+            fi
+        else
+            # Session doesn't exist anymore, skip it
+            continue
+        fi
+    else
+        # Not a session line (state line, etc), keep it
+        echo "$line" >> "$TEMP_FILE"
+    fi
+done < "$LAST_SAVE"
+
+# Replace original file with filtered version if temp file was created
+if [ -f "$TEMP_FILE" ]; then
+    mv "$TEMP_FILE" "$LAST_SAVE"
+fi

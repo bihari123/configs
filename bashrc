@@ -121,6 +121,15 @@ export PATH=$PATH:$HOME/go/bin
 # Start prompt at the bottom of terminal
 printf '\033[2J\033[999B'
 
+# ============================================================================
+# Bash Auto-Suggestions & Syntax Highlighting (ble.sh)
+# ============================================================================
+# Install with: git clone --recursive --depth 1 --shallow-submodules https://github.com/akinomyoga/ble.sh.git ~/.local/share/blesh
+# Then run: make -C ~/.local/share/blesh install PREFIX=~/.local
+if [[ -f ~/.local/share/blesh/ble.sh ]]; then
+    source ~/.local/share/blesh/ble.sh --noattach
+fi
+
 eval "$(oh-my-posh init bash --config ~/.config/oh-my-posh-dark-colorblind.omp.json)"
 
 #eval "$(starship init bash)"
@@ -210,4 +219,9 @@ fkill() {
     echo $pid | xargs kill -${1:-9}
   fi
 }
+
+# ============================================================================
+# Attach ble.sh (must be at the end of bashrc)
+# ============================================================================
+[[ ${BLE_VERSION-} ]] && ble-attach
 

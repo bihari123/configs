@@ -1,0 +1,73 @@
+# LazyDocker Configuration
+gui:
+  # Color theme
+  theme:
+    activeBorderColor:
+      - '#58a6ff'
+      - bold
+    inactiveBorderColor:
+      - '#30363d'
+    selectedLineBgColor:
+      - '#1f6feb'
+
+  # UI Settings
+  scrollHeight: 2
+  scrollPastBottom: true
+  mouseEvents: true
+  skipUnchangedStateScreenUpdates: false
+  skipDiscardChangeWarning: false
+
+  # Which panels to show
+  showAllContainers: false
+
+# How to show container logs
+logs:
+  timestamps: false
+  since: '60m'
+  tail: '300'
+
+# How commands are run
+commandTemplates:
+  dockerCompose: docker-compose
+  restartService: '{{ .DockerCompose }} restart {{ .Service.Name }}'
+  up: '{{ .DockerCompose }} up -d'
+  down: '{{ .DockerCompose }} down'
+  downWithVolumes: '{{ .DockerCompose }} down --volumes'
+  upService: '{{ .DockerCompose }} up -d {{ .Service.Name }}'
+  startService: '{{ .DockerCompose }} start {{ .Service.Name }}'
+  stopService: '{{ .DockerCompose }} stop {{ .Service.Name }}'
+  serviceLogs: '{{ .DockerCompose }} logs --since=60m --follow {{ .Service.Name }}'
+  viewServiceLogs: '{{ .DockerCompose }} logs --follow {{ .Service.Name }}'
+  rebuildService: '{{ .DockerCompose }} up -d --build {{ .Service.Name }}'
+  recreateService: '{{ .DockerCompose }} up -d --force-recreate {{ .Service.Name }}'
+
+# Custom commands
+customCommands:
+  containers:
+    - name: bash
+      attach: true
+      command: 'docker exec -it {{ .Container.ID }} /bin/bash'
+      serviceNames: []
+    - name: sh
+      attach: true
+      command: 'docker exec -it {{ .Container.ID }} /bin/sh'
+      serviceNames: []
+  services:
+    - name: bash
+      attach: true
+      command: 'docker-compose exec {{ .Service.Name }} /bin/bash'
+      serviceNames: []
+    - name: sh
+      attach: true
+      command: 'docker-compose exec {{ .Service.Name }} /bin/sh'
+      serviceNames: []
+
+# Stats
+stats:
+  graphs:
+    - caption: CPU (%)
+      statPath: DerivedStats.CPUPercentage
+      color: blue
+    - caption: Memory (%)
+      statPath: DerivedStats.MemoryPercentage
+      color: green
