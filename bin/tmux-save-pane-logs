@@ -1,0 +1,117 @@
+#!/bin/bash
+# Extract and save pane contents from tmux-resurrect archive to individual log files
+# Saves last 500 lines per pane for easy access
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+PANE_LOGS_DIR="$HOME/.tmux/pane-logs"
+ARCHIVE="$RESURRECT_DIR/pane_contents.tar.gz"
+
+# Number of lines to save per pane
+LINES_TO_SAVE=500
+
+# Create logs directory
+mkdir -p "$PANE_LOGS_DIR"
+
+# Check if archive exists
+if [ ! -f "$ARCHIVE" ]; then
+    echo "⚠️  No pane contents archive found. Run a save first (Alt+Shift+s)"
+    exit 0
+fi
+
+# Create timestamp for this save
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+SAVE_DIR="$PANE_LOGS_DIR/$TIMESTAMP"
+mkdir -p "$SAVE_DIR"
+
+# Create symlink to latest
+rm -f "$PANE_LOGS_DIR/latest"
+ln -sf "$TIMESTAMP" "$PANE_LOGS_DIR/latest"
+
+# Extract archive to temp location
+TEMP_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_DIR" EXIT
+
+tar -xzf "$ARCHIVE" -C "$TEMP_DIR" 2>/dev/null || {
+    echo "❌ Failed to extract pane contents archive"
+    exit 1
+}
+
+# Process each pane file
+PANE_COUNT=0
+find "$TEMP_DIR/pane_contents" -type f -name "pane-*" | while read -r pane_file; do
+    PANE_COUNT=$((PANE_COUNT + 1))
+
+    # Extract pane ID from filename: pane-session:window.pane
+    PANE_ID=$(basename "$pane_file" | sed 's/^pane-//')
+
+    # Parse components
+    SESSION=$(echo "$PANE_ID" | cut -d: -f1)
+    WIN_PANE=$(echo "$PANE_ID" | cut -d: -f2)
+    WINDOW=$(echo "$WIN_PANE" | cut -d. -f1)
+    PANE=$(echo "$WIN_PANE" | cut -d. -f2)
+
+    # Create session directory
+    SESSION_DIR="$SAVE_DIR/$SESSION"
+    mkdir -p "$SESSION_DIR"
+
+    # Output filename
+    LOG_FILE="$SESSION_DIR/window-${WINDOW}_pane-${PANE}.log"
+
+    # Get last N lines, remove ANSI escape codes, save to log file
+    tail -n "$LINES_TO_SAVE" "$pane_file" | \
+        sed 's/\x1b\[[0-9;]*m//g' | \
+        sed 's/\x1b\]0;.*\x07//g' | \
+        sed 's/\r//g' > "$LOG_FILE"
+
+    # Get line count
+    LINE_COUNT=$(wc -l < "$LOG_FILE")
+
+    echo "  ✓ $PANE_ID → $LOG_FILE ($LINE_COUNT lines)"
+done
+
+# Count total files saved
+TOTAL_FILES=$(find "$SAVE_DIR" -type f -name "*.log" | wc -l)
+
+echo ""
+echo "════════════════════════════════════════════════════════════"
+echo "📝 Pane Logs Saved: $TOTAL_FILES panes"
+echo "────────────────────────────────────────────────────────────"
+echo "📂 Location: $SAVE_DIR"
+echo "🔗 Latest:   $PANE_LOGS_DIR/latest"
+echo "────────────────────────────────────────────────────────────"
+echo "📋 Per pane: Last $LINES_TO_SAVE lines saved"
+echo "════════════════════════════════════════════════════════════"
+echo ""
+
+# Capture running processes for resurrection
+echo "📦 Capturing running processes..."
+if [ -f "$HOME/configs/bin/tmux-capture-processes" ]; then
+    "$HOME/configs/bin/tmux-capture-processes" "$SAVE_DIR"
+fi
+echo ""
+
+# Show directory structure
+if [ "$TOTAL_FILES" -gt 0 ]; then
+    echo "Directory structure:"
+    tree -L 2 "$SAVE_DIR" 2>/dev/null || ls -R "$SAVE_DIR"
+    echo ""
+fi
+
+# Clean up old logs (keep last 10 saves)
+KEEP_COUNT=10
+OLD_LOGS=$(ls -1dt "$PANE_LOGS_DIR"/2* 2>/dev/null | tail -n +$((KEEP_COUNT + 1)))
+if [ -n "$OLD_LOGS" ]; then
+    echo "🧹 Cleaning up old logs (keeping last $KEEP_COUNT saves)..."
+    echo "$OLD_LOGS" | while read -r old_dir; do
+        echo "   Removing: $(basename "$old_dir")"
+        rm -rf "$old_dir"
+    done
+    echo ""
+fi
+
+echo "✅ Pane logs saved successfully!"
+echo ""
+echo "To view logs:"
+echo "  cat $PANE_LOGS_DIR/latest/SESSION_NAME/window-X_pane-Y.log"
+echo "  or"
+echo "  ls -lh $PANE_LOGS_DIR/latest/"

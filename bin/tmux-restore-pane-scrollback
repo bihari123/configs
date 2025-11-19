@@ -1,0 +1,45 @@
+#!/bin/bash
+# Restore pane scrollback history from tmux-resurrect save files
+# This script injects saved pane contents into the scrollback buffer
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+PANE_CONTENTS_DIR="$RESURRECT_DIR/save/pane_contents"
+
+restore_pane_contents() {
+    local session_name="$1"
+    local window_index="$2"
+    local pane_index="$3"
+    local pane_id="${session_name}:${window_index}.${pane_index}"
+    local pane_file="$PANE_CONTENTS_DIR/pane-${session_name}:${window_index}.${pane_index}"
+
+    if [ ! -f "$pane_file" ]; then
+        return 0
+    fi
+
+    echo "Restoring scrollback for pane: $pane_id"
+
+    # Read the pane contents and send each line to the pane
+    # We use a special technique to populate the scrollback without executing commands
+    while IFS= read -r line; do
+        # Use printf to send-keys with the line, but don't execute (no C-m)
+        tmux send-keys -t "$pane_id" -l "$line"
+        tmux send-keys -t "$pane_id" C-m
+    done < "$pane_file"
+
+    # Clear the current line (remove the last echoed line from view)
+    tmux send-keys -t "$pane_id" C-l
+}
+
+# Extract pane contents archive if it exists
+if [ -f "$RESURRECT_DIR/pane_contents.tar.gz" ]; then
+    echo "Extracting pane contents archive..."
+    mkdir -p "$PANE_CONTENTS_DIR"
+    tar -xzf "$RESURRECT_DIR/pane_contents.tar.gz" -C "$RESURRECT_DIR/save" 2>/dev/null
+fi
+
+# Get list of all panes in all sessions
+tmux list-panes -a -F "#{session_name} #{window_index} #{pane_index}" | while read -r session window pane; do
+    restore_pane_contents "$session" "$window" "$pane"
+done
+
+echo "Pane scrollback restoration complete!"

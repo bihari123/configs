@@ -1,0 +1,130 @@
+#!/bin/bash
+# Capture running processes in each tmux pane for later restoration
+
+PANE_LOGS_DIR="$HOME/.tmux/pane-logs"
+
+# Use provided SAVE_DIR or latest
+if [ -n "$1" ]; then
+    SAVE_DIR="$1"
+else
+    SAVE_DIR="$PANE_LOGS_DIR/latest"
+    # Resolve symlink to actual directory
+    if [ -L "$SAVE_DIR" ]; then
+        SAVE_DIR=$(readlink -f "$SAVE_DIR")
+    fi
+fi
+
+# Whitelist patterns for processes to capture
+# Format: "pattern|--auto" for auto-execute, "pattern" for manual
+WHITELIST=(
+    # Read-only tools (auto-execute safe)
+    "btop|--auto"
+    "htop|--auto"
+    "nvim|--auto"
+    "vim|--auto"
+    "less|--auto"
+    "man|--auto"
+    "tig|--auto"
+    "lazygit|--auto"
+    "lazydocker|--auto"
+    "k9s|--auto"
+
+    # Development servers (manual - need to press Enter)
+    "npm.*start"
+    "npm.*dev"
+    "npm.*serve"
+    "yarn.*start"
+    "yarn.*dev"
+    "pnpm.*dev"
+    "python.*-m.*http.server"
+    "python.*manage.py.*runserver"
+    "rails.*server"
+    "hugo.*server"
+    "bundle.*exec"
+
+    # Build watchers (manual)
+    "cargo.*watch"
+    "npm.*watch"
+    "yarn.*watch"
+    "tsc.*--watch"
+    "webpack.*--watch"
+    "nodemon"
+    "air"  # Go live reload
+
+    # Long-running scripts (manual)
+    "python.*\.py"
+    "node.*\.js"
+    "bash.*\.sh"
+    "ruby.*\.rb"
+    "go.*run"
+    "cargo.*run"
+
+    # Database clients (manual)
+    "psql"
+    "mysql"
+    "sqlite3"
+    "redis-cli"
+    "mongo"
+    "mongosh"
+
+    # Other useful tools
+    "ssh"
+    "tail.*-f"
+    "watch"
+)
+
+# Get all tmux panes
+tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index} #{pane_id} #{pane_pid}" | while read -r pane_info pane_id pane_pid; do
+    # Parse pane info
+    SESSION=$(echo "$pane_info" | cut -d: -f1)
+    WIN_PANE=$(echo "$pane_info" | cut -d: -f2)
+    WINDOW=$(echo "$WIN_PANE" | cut -d. -f1)
+    PANE=$(echo "$WIN_PANE" | cut -d. -f2)
+
+    # Create session directory
+    SESSION_DIR="$SAVE_DIR/$SESSION"
+    mkdir -p "$SESSION_DIR"
+
+    # Output file for process info
+    PROCESS_FILE="$SESSION_DIR/window-${WINDOW}_pane-${PANE}.process"
+
+    # Get the process running in this pane
+    # Look for the most recent child process (not just the shell)
+    PROCESS_CMD=$(pgrep -P "$pane_pid" -n | xargs -r ps -o cmd= -p 2>/dev/null || echo "")
+
+    if [ -z "$PROCESS_CMD" ]; then
+        # No child process, check if shell itself is running something
+        PROCESS_CMD=$(ps -o cmd= -p "$pane_pid" 2>/dev/null || echo "bash")
+    fi
+
+    # Check if process matches whitelist
+    AUTO_EXEC="false"
+    MATCHED="false"
+
+    for pattern in "${WHITELIST[@]}"; do
+        # Split pattern and flag
+        PATTERN_PART=$(echo "$pattern" | cut -d'|' -f1)
+        FLAG_PART=$(echo "$pattern" | cut -d'|' -f2 -s)
+
+        # Check if command matches pattern
+        if echo "$PROCESS_CMD" | grep -qE "$PATTERN_PART"; then
+            MATCHED="true"
+            if [ "$FLAG_PART" = "--auto" ]; then
+                AUTO_EXEC="true"
+            fi
+            break
+        fi
+    done
+
+    # Only save if matched whitelist
+    if [ "$MATCHED" = "true" ]; then
+        # Save process info in simple format
+        cat > "$PROCESS_FILE" <<EOF
+COMMAND=$PROCESS_CMD
+AUTO_EXEC=$AUTO_EXEC
+PANE_ID=$pane_id
+CAPTURED_AT=$(date '+%Y-%m-%d %H:%M:%S')
+EOF
+        echo "  ✓ $pane_info: $PROCESS_CMD (auto=$AUTO_EXEC)"
+    fi
+done

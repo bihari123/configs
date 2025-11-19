@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+# Auto-display previous pane content after tmux-resurrect restore
+# This runs once per pane after a restore operation
+
+# Only run in tmux
+[ -n "$TMUX" ] || exit 0
+
+# Check if we're in a restore scenario
+RESTORE_FLAG="$HOME/.tmux/resurrect/.restore-in-progress"
+SHOWN_FLAG="$HOME/.tmux/resurrect/.pane-content-shown-$$"
+
+# If restore flag doesn't exist or we've already shown content for this pane, exit
+[ -f "$RESTORE_FLAG" ] || exit 0
+[ -f "$SHOWN_FLAG" ] && exit 0
+
+# Mark this pane as shown (prevent re-running)
+touch "$SHOWN_FLAG"
+
+# Get current pane info using TMUX_PANE environment variable
+# This ensures we get info for THIS pane, not the active/focused pane
+if [ -z "$TMUX_PANE" ]; then
+    exit 0
+fi
+
+SESSION=$(tmux display-message -p -t "$TMUX_PANE" '#S' 2>/dev/null)
+WINDOW=$(tmux display-message -p -t "$TMUX_PANE" '#I' 2>/dev/null)
+PANE=$(tmux display-message -p -t "$TMUX_PANE" '#P' 2>/dev/null)
+
+# Exit if we couldn't get pane info
+[ -n "$SESSION" ] || exit 0
+
+# Use the latest saved pane logs
+PANE_LOGS="$HOME/.tmux/pane-logs"
+LOG_DIR="$PANE_LOGS/latest"
+
+# Check if logs exist
+if [ ! -d "$LOG_DIR" ]; then
+    exit 0
+fi
+
+# Construct log file path for this specific pane
+LOG_FILE="$LOG_DIR/$SESSION/window-${WINDOW}_pane-${PANE}.log"
+
+if [ -f "$LOG_FILE" ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📜 Restoring previous pane content ($SESSION:$WINDOW.$PANE)"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    # Dump log content into scrollback
+    cat "$LOG_FILE"
+
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "✅ Pane content restored | Scroll back with Ctrl+b [ to view history"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+fi
+
+# Check for saved process to restore
+PROCESS_FILE="$LOG_DIR/$SESSION/window-${WINDOW}_pane-${PANE}.process"
+
+if [ -f "$PROCESS_FILE" ]; then
+    # Source the process metadata
+    source "$PROCESS_FILE"
+
+    if [ -n "$COMMAND" ]; then
+        if [ "$AUTO_EXEC" = "true" ]; then
+            # Auto-execute for read-only tools
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "🔄 Auto-executing: $COMMAND"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+
+            # Schedule command execution after shell is ready (500ms delay)
+            # Use tmux run-shell to send keys from outside the pane
+            tmux run-shell -b "sleep 0.5 && tmux send-keys -t '$TMUX_PANE' '$(echo "$COMMAND" | sed "s/'/'\\\\''/g")' Enter"
+        else
+            # Populate command line (user presses Enter to execute)
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "⏸️  Process was running: $COMMAND"
+            echo "   Press Enter to restart, or edit the command first"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+
+            # Schedule command population after shell is ready (500ms delay)
+            # Use tmux run-shell to send keys from outside the pane
+            tmux run-shell -b "sleep 0.5 && tmux send-keys -t '$TMUX_PANE' '$(echo "$COMMAND" | sed "s/'/'\\\\''/g")'"
+        fi
+    fi
+fi

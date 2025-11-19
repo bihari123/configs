@@ -1,0 +1,52 @@
+#!/bin/bash
+# View saved pane contents from last tmux-resurrect save
+# Usage: tmux-view-saved-pane [session:window.pane]
+#   If no argument, shows current pane
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+
+# Get pane ID
+if [ -z "$1" ]; then
+    # Get current pane
+    PANE_ID=$(tmux display-message -p "#{session_name}:#{window_index}.#{pane_index}")
+else
+    PANE_ID="$1"
+fi
+
+# Parse pane ID
+SESSION=$(echo "$PANE_ID" | cut -d: -f1)
+WIN_PANE=$(echo "$PANE_ID" | cut -d: -f2)
+WINDOW=$(echo "$WIN_PANE" | cut -d. -f1)
+PANE=$(echo "$WIN_PANE" | cut -d. -f2)
+
+# Extract pane contents archive to temp location
+TEMP_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_DIR" EXIT
+
+if [ ! -f "$RESURRECT_DIR/pane_contents.tar.gz" ]; then
+    echo "❌ No saved pane contents found."
+    echo "   Save with: Alt+Shift+s"
+    exit 1
+fi
+
+tar -xzf "$RESURRECT_DIR/pane_contents.tar.gz" -C "$TEMP_DIR" 2>/dev/null
+
+# Find the pane file
+PANE_FILE="$TEMP_DIR/pane_contents/pane-${SESSION}:${WINDOW}.${PANE}"
+
+if [ ! -f "$PANE_FILE" ]; then
+    echo "❌ No saved contents for pane: $PANE_ID"
+    echo ""
+    echo "Available panes:"
+    ls "$TEMP_DIR/pane_contents/" 2>/dev/null | sed 's/pane-/  /'
+    exit 1
+fi
+
+# Show the contents with less
+echo "═══════════════════════════════════════════════════════════"
+echo "📜 Saved contents of pane: $PANE_ID"
+echo "═══════════════════════════════════════════════════════════"
+echo ""
+
+# Remove ANSI escape codes and show with less
+sed 's/\x1b\[[0-9;]*m//g' "$PANE_FILE" | less -R +G

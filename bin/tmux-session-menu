@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Ensure we have the full PATH (tmux popup uses limited environment)
+export PATH="$HOME/.local/bin:$HOME/bin:$HOME/go/bin:$HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 # Get list of existing sessions
 sessions=($(tmux list-sessions -F '#S' 2>/dev/null))
 current_session=$(tmux display-message -p '#S')

@@ -49,3 +49,6 @@ done < "$LAST_SAVE"
 if [ -f "$TEMP_FILE" ]; then
     mv "$TEMP_FILE" "$LAST_SAVE"
 fi
+
+# Save pane logs to individual files (last 500 lines per pane)
+"$HOME/configs/bin/tmux-save-pane-logs" > /dev/null 2>&1 &

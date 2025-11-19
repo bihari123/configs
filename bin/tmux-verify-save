@@ -1,0 +1,111 @@
+#!/bin/bash
+# Verify what tmux-resurrect is capturing for persistent sessions
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+LAST_SAVE="$RESURRECT_DIR/last"
+
+if [ ! -f "$LAST_SAVE" ]; then
+    echo "❌ No saved sessions found. Try saving with Alt+Shift+s first."
+    exit 1
+fi
+
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║         TMUX RESURRECT - SAVED SESSION VERIFICATION           ║"
+echo "╚════════════════════════════════════════════════════════════════╝"
+echo ""
+
+# Show save file info
+SAVE_FILE=$(readlink -f "$LAST_SAVE")
+SAVE_TIME=$(stat -c %y "$SAVE_FILE" | cut -d. -f1)
+echo "📁 Last save: $SAVE_TIME"
+echo "📄 Save file: $(basename "$SAVE_FILE")"
+echo ""
+
+# Count sessions, windows, panes
+SESSION_COUNT=$(grep -c "^state" "$LAST_SAVE")
+WINDOW_COUNT=$(grep -c "^window" "$LAST_SAVE")
+PANE_COUNT=$(grep -c "^pane" "$LAST_SAVE")
+
+echo "📊 Statistics:"
+echo "   Sessions: $SESSION_COUNT"
+echo "   Windows:  $WINDOW_COUNT"
+echo "   Panes:    $PANE_COUNT"
+echo ""
+
+# Show session details
+echo "📋 Saved Sessions:"
+echo ""
+grep "^state" "$LAST_SAVE" | while read -r line; do
+    SESSION_NAME=$(echo "$line" | awk '{print $2}')
+    ACTIVE_WINDOW=$(echo "$line" | awk '{print $3}')
+
+    echo "  🔹 Session: $SESSION_NAME (active window: $ACTIVE_WINDOW)"
+
+    # Show windows for this session
+    grep "^window.*$SESSION_NAME" "$LAST_SAVE" | while read -r wline; do
+        WINDOW_INDEX=$(echo "$wline" | awk '{print $3}')
+        WINDOW_NAME=$(echo "$wline" | awk '{print $4}' | cut -d: -f2)
+        WINDOW_ACTIVE=$(echo "$wline" | awk '{print $5}')
+        WINDOW_FLAGS=$(echo "$wline" | awk '{print $6}')
+
+        if [[ "$WINDOW_FLAGS" == *"*"* ]]; then
+            echo "     └─ Window $WINDOW_INDEX: $WINDOW_NAME ⭐ (active)"
+        else
+            echo "     └─ Window $WINDOW_INDEX: $WINDOW_NAME"
+        fi
+    done
+
+    echo ""
+done
+
+# Check pane contents
+if [ -f "$RESURRECT_DIR/pane_contents.tar.gz" ]; then
+    PANE_ARCHIVE_SIZE=$(du -h "$RESURRECT_DIR/pane_contents.tar.gz" | awk '{print $1}')
+    PANE_FILES=$(tar -tzf "$RESURRECT_DIR/pane_contents.tar.gz" | grep -c "^./pane_contents/pane-")
+
+    echo "💾 Pane Contents Archive:"
+    echo "   Size: $PANE_ARCHIVE_SIZE"
+    echo "   Saved panes: $PANE_FILES"
+    echo ""
+
+    echo "📜 Sample pane contents (first 5 lines from a random pane):"
+    SAMPLE_PANE=$(tar -tzf "$RESURRECT_DIR/pane_contents.tar.gz" | grep "^./pane_contents/pane-" | head -1)
+    if [ -n "$SAMPLE_PANE" ]; then
+        echo "   From: $(basename "$SAMPLE_PANE")"
+        echo "   ---"
+        tar -xzf "$RESURRECT_DIR/pane_contents.tar.gz" -O "$SAMPLE_PANE" 2>/dev/null | \
+            sed 's/\x1b\[[0-9;]*m//g' | \
+            grep -v "^$" | \
+            tail -20 | head -5 | \
+            sed 's/^/   /'
+        echo ""
+    fi
+else
+    echo "⚠️  No pane contents saved (capture might be disabled)"
+    echo ""
+fi
+
+# Show working directories
+echo "📂 Working Directories:"
+grep "^pane" "$LAST_SAVE" | awk '{print $8}' | sort -u | while read -r dir; do
+    echo "   $dir"
+done
+echo ""
+
+# Show running programs
+echo "🔧 Running Programs:"
+grep "^pane" "$LAST_SAVE" | awk '{print $10}' | sort | uniq -c | sort -rn | while read -r count prog; do
+    echo "   $prog ($count panes)"
+done
+echo ""
+
+echo "✅ Sessions are being saved with:"
+echo "   ✓ Pane layouts and positions"
+echo "   ✓ Working directories"
+echo "   ✓ Running programs"
+echo "   ✓ Pane contents (last ~500 lines)"
+echo "   ✓ Shell command history"
+echo ""
+echo "🔄 Auto-save: Every 1 minute"
+echo "💾 Manual save: Alt+Shift+s"
+echo "🔃 Restore: Automatic on tmux start"

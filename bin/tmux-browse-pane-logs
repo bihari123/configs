@@ -1,0 +1,60 @@
+#!/bin/bash
+# Browse pane logs - show menu of saved pane logs
+
+PANE_LOGS_DIR="$HOME/.tmux/pane-logs/latest"
+
+if [ ! -d "$PANE_LOGS_DIR" ]; then
+    echo "❌ No pane logs found."
+    echo ""
+    echo "Pane logs are saved automatically when you save sessions."
+    echo "Save now with: Alt+Shift+s"
+    exit 1
+fi
+
+# Build list of log files with session/window/pane info
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║              SAVED PANE LOGS (Last 500 Lines)              ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+# List all sessions
+for session_dir in "$PANE_LOGS_DIR"/*; do
+    if [ ! -d "$session_dir" ]; then
+        continue
+    fi
+
+    SESSION=$(basename "$session_dir")
+    echo "  📁 Session: $SESSION"
+    echo ""
+
+    # List all log files in this session
+    find "$session_dir" -type f -name "*.log" | sort | while read -r log_file; do
+        # Get window and pane from filename
+        FILENAME=$(basename "$log_file" .log)
+        WINDOW=$(echo "$FILENAME" | sed 's/window-\([0-9]*\)_pane-\([0-9]*\)/\1/')
+        PANE=$(echo "$FILENAME" | sed 's/window-\([0-9]*\)_pane-\([0-9]*\)/\2/')
+
+        # Get file size and line count
+        SIZE=$(du -h "$log_file" | cut -f1)
+        LINES=$(wc -l < "$log_file")
+
+        echo "     📄 Window $WINDOW, Pane $PANE"
+        echo "        ├─ File: $(basename "$log_file")"
+        echo "        ├─ Size: $SIZE ($LINES lines)"
+        echo "        └─ cat $log_file"
+        echo ""
+    done
+done
+
+echo "────────────────────────────────────────────────────────────"
+echo "📂 Location: $PANE_LOGS_DIR"
+echo ""
+echo "Commands:"
+echo "  • View specific pane:"
+echo "    cat $PANE_LOGS_DIR/SESSION/window-X_pane-Y.log"
+echo ""
+echo "  • Browse all logs:"
+echo "    ls -lh $PANE_LOGS_DIR/"
+echo ""
+echo "  • Search in logs:"
+echo "    grep -r 'search term' $PANE_LOGS_DIR/"

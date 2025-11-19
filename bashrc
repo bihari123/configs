@@ -150,7 +150,19 @@ HISTSIZE=50000
 HISTFILESIZE=100000
 HISTTIMEFORMAT="%F %T "
 shopt -s histverify
+shopt -s histappend  # Append to history file, don't overwrite
 HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"
+
+# For tmux-resurrect: save history after each command
+if [ -n "$TMUX" ]; then
+    # Save history immediately after each command
+    PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
+
+    # Auto-display previous pane content after restore (runs once per pane)
+    if [ -f "$HOME/configs/bin/tmux-auto-restore-content" ]; then
+        "$HOME/configs/bin/tmux-auto-restore-content"
+    fi
+fi
 
 # Environment Variables
 export EDITOR=nvim
@@ -225,3 +237,13 @@ fkill() {
 # ============================================================================
 [[ ${BLE_VERSION-} ]] && ble-attach
 
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/bin:$PATH"
+
+# Pyenv
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
