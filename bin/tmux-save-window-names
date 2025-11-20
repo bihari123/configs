@@ -26,5 +26,4 @@ tmux list-sessions | while read -r session_line; do
     tmux list-windows -t "$session_name" -F "${session_name}|#{window_index}|#{window_name}" >> "$WINDOW_NAMES_FILE"
 done
 
-# Silent operation - only show minimal output
-echo "Window names saved ($(wc -l < "$WINDOW_NAMES_FILE") entries)" 2>/dev/null || true
+# Silent operation for hooks

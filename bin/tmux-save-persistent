@@ -21,5 +21,6 @@ is_persistent=$(tmux show-options -t "$current_session" -v @session-persistent 2
 
 # Only save if session is persistent
 if [ "$is_persistent" = "true" ]; then
-    exec "$RESURRECT_SAVE"
+    # Suppress all output to prevent terminal gaps
+    exec "$RESURRECT_SAVE" >/dev/null 2>&1
 fi

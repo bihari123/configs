@@ -118,8 +118,10 @@ fi
 export PATH=$PATH:/usr/local/go/bin
 export PATH=$PATH:/home/tarun/.local/bin
 export PATH=$PATH:$HOME/go/bin
-# Start prompt at the bottom of terminal
-printf '\033[2J\033[999B'
+# Start prompt at the bottom of terminal (only when not in tmux)
+if [ -z "$TMUX" ]; then
+    printf '\033[2J\033[999B'
+fi
 
 # ============================================================================
 # Bash Auto-Suggestions & Syntax Highlighting (ble.sh)
@@ -160,7 +162,7 @@ if [ -n "$TMUX" ]; then
 
     # Auto-display previous pane content after restore (runs once per pane)
     if [ -f "$HOME/configs/bin/tmux-auto-restore-content" ]; then
-        "$HOME/configs/bin/tmux-auto-restore-content"
+        "$HOME/configs/bin/tmux-auto-restore-content" >/dev/null 2>&1
     fi
 fi
 
