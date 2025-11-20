@@ -1,0 +1,38 @@
+#!/bin/bash
+
+echo "=== Demo: Setting up processes for restoration test ==="
+echo ""
+
+# Create a new session for demo
+tmux new-session -d -s "demo-processes"
+
+# Split into multiple panes
+tmux split-window -h -t "demo-processes"
+tmux split-window -v -t "demo-processes:0.0"
+
+# Start different processes in each pane
+echo "Starting processes in demo session..."
+
+# Pane 0.0: Start a process that simulates npm start
+tmux send-keys -t "demo-processes:0.0" 'echo "Starting simulated npm start..." && sleep 9999 & echo "npm start running with PID $!"' Enter
+tmux select-pane -t "demo-processes:0.0"
+tmux rename-window "dev-server"
+
+# Pane 0.1: Start btop (if available) or top
+tmux send-keys -t "demo-processes:0.1" 'which btop > /dev/null && btop || htop || top' Enter
+
+# Pane 0.2: Start a simulated database connection
+tmux send-keys -t "demo-processes:0.2" 'echo "Connected to database (simulated)" && while true; do echo "Query result: $(date)"; sleep 5; done' Enter
+tmux rename-window "database"
+
+echo ""
+echo "Demo session created with processes:"
+echo "- 0.0: Simulated npm start (background process)"
+echo "- 0.1: System monitor (btop/htop)"
+echo "- 0.2: Simulated database connection"
+echo ""
+echo "Now run:"
+echo "  tmux save-session ~/.tmux/resurrect/demo_save.txt"
+echo "  ~/configs/bin/tmux-process-manager --dry-run --demo"
+echo ""
+echo "Or switch to demo session: tmux attach-session -t demo-processes"

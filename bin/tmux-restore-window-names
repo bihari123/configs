@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Script to restore tmux window names after tmux-resurrect
+# This script reads saved window names and restores them
+
+WINDOW_NAMES_FILE="$HOME/.tmux/resurrect/window_names.txt"
+
+# Exit if no window names file exists
+if [[ ! -f "$WINDOW_NAMES_FILE" ]]; then
+    echo "No window names file found: $WINDOW_NAMES_FILE"
+    exit 0
+fi
+
+# Silent operation for automatic restore
+
+# Small delay to ensure tmux-resurrect has finished restoring windows
+sleep 0.5
+
+# Restore window names
+while IFS='|' read -r session_name window_index window_name; do
+    # Skip comment lines
+    if [[ "$session_name" == "#"* ]]; then
+        continue
+    fi
+
+    if [[ -n "$session_name" && -n "$window_index" && -n "$window_name" ]]; then
+        # Only restore if the window name is not the default "bash" or similar
+        if [[ "$window_name" != "bash" && "$window_name" != "zsh" && "$window_name" != "fish" && "$window_name" != "bash-" && "$window_name" != "bash*" ]]; then
+            # Check if session exists before trying to restore
+            if tmux list-sessions | grep -q "^${session_name}:"; then
+                # Check if window exists before trying to rename it
+                if tmux list-windows -t "$session_name" | grep -q "^${window_index}:"; then
+                    tmux rename-window -t "$session_name:$window_index" "$window_name" 2>/dev/null
+                else
+                    echo "Window $session_name:$window_index does not exist, skipping"
+                fi
+            else
+                echo "Session '$session_name' does not exist, skipping"
+            fi
+        fi
+    fi
+done < "$WINDOW_NAMES_FILE"
+
+# Silent completion

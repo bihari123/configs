@@ -1,0 +1,279 @@
+#!/bin/bash
+
+# Enhanced process tracker that captures actual running processes
+# Including child processes that tmux-resurrect misses
+
+ENHANCED_STATE_FILE="$HOME/.tmux/resurrect/actual_processes.json"
+TEMP_FILE="/tmp/processes_$$"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Auto-execution whitelist
+declare -A AUTO_PROCESSES=(
+    ["ssh"]="auto"
+    ["psql"]="auto"
+    ["mysql"]="auto"
+    ["sqlite3"]="auto"
+    ["npm start"]="auto"
+    ["npm run dev"]="auto"
+    ["python"]="auto"
+    ["python3"]="auto"
+    ["node"]="auto"
+    ["go run"]="auto"
+    ["cargo run"]="auto"
+    ["btop"]="auto"
+    ["htop"]="auto"
+    ["top"]="auto"
+    ["vim"]="auto"
+    ["nvim"]="auto"
+    ["vi"]="auto"
+)
+
+# Capture actual running processes from all tmux panes
+capture_actual_processes() {
+    echo -e "${BLUE}Capturing actual running processes...${NC}"
+
+    # Create JSON structure
+    echo "{" > "$ENHANCED_STATE_FILE"
+
+    local first=true
+
+    # Process each tmux pane
+    tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index}|#{pane_id}|#{pane_current_path}|#{pane_title}" | while IFS='|' read -r location pane_id cwd title; do
+        if [ "$first" = false ]; then
+            echo "," >> "$ENHANCED_STATE_FILE"
+        fi
+        first=false
+
+        # Get the PID of the process running in this pane
+        local pane_pid=$(tmux display-message -p -t "$pane_id" "#{pane_pid}" 2>/dev/null || echo "")
+
+        # Initialize process list
+        local processes=()
+
+        # Get the main process
+        if [ -n "$pane_pid" ] && [ "$pane_pid" != "0" ]; then
+            local main_cmd=$(ps -p "$pane_pid" -o cmd --no-headers 2>/dev/null | sed 's/^-*//' | tr -d '\n')
+            if [ -n "$main_cmd" ]; then
+                processes+=("$pane_pid:$main_cmd:main")
+            fi
+
+            # Get all child processes recursively
+            local children=$(find /proc -maxdepth 2 -name status -exec grep -l "^PPid:[[:space:]]*$pane_pid$" {} \; 2>/dev/null | while read status_file; do
+                local child_pid=$(basename "$(dirname "$status_file")")
+                if [ -d "/proc/$child_pid" ] && [ "$child_pid" != "$pane_pid" ]; then
+                    local child_cmd=$(ps -p "$child_pid" -o cmd --no-headers 2>/dev/null | sed 's/^-*//' | tr -d '\n')
+                    echo "$child_pid:$child_cmd:child"
+                fi
+            done)
+
+            while IFS= read -r child_info; do
+                if [ -n "$child_info" ]; then
+                    processes+=("$child_info")
+                fi
+            done <<< "$children"
+        fi
+
+        # If no processes found, at least record the shell
+        if [ ${#processes[@]} -eq 0 ]; then
+            local shell_cmd=$(tmux display-message -p -t "$pane_id" "#{pane_current_command}" 2>/dev/null || echo "bash")
+            processes+=("0:$shell_cmd:shell")
+        fi
+
+        # Parse location
+        IFS=':' read -r session pane_id_temp <<< "$location"
+        IFS='.' read -r window pane <<< "$pane_id_temp"
+
+        # Create JSON entry
+        local process_json=""
+        local process_first=true
+
+        for process_info in "${processes[@]}"; do
+            IFS=':' read -r pid cmd type <<< "$process_info"
+
+            if [ "$process_first" = false ]; then
+                process_json="$process_json,"
+            fi
+            process_first=true
+
+            # Check if this process should auto-execute
+            local auto_execute="false"
+            local auto_reason=""
+
+            for proc_pattern in "${!AUTO_PROCESSES[@]}"; do
+                if [[ "$cmd" == *"$proc_pattern"* ]]; then
+                    auto_execute="true"
+                    auto_reason="$proc_pattern"
+                    break
+                fi
+            done
+
+            process_json="$process_json {
+                \"pid\": \"$pid\",
+                \"command\": \"$cmd\",
+                \"type\": \"$type\",
+                \"auto_execute\": $auto_execute,
+                \"auto_reason\": \"$auto_reason\"
+            }"
+        done
+
+        # Write JSON entry for this pane
+        cat >> "$ENHANCED_STATE_FILE" << EOF
+  "$location": {
+    "session": "$session",
+    "window": "$window",
+    "pane": "$pane",
+    "cwd": "$cwd",
+    "title": "$title",
+    "pane_pid": "$pane_pid",
+    "processes": [$process_json]
+  }
+EOF
+
+    done
+
+    echo "}" >> "$ENHANCED_STATE_FILE"
+    echo -e "${GREEN}Process data saved to $ENHANCED_STATE_FILE${NC}"
+}
+
+# Execute processes in their correct panes
+execute_processes() {
+    local auto_only="${1:-false}"
+    local dry_run="${2:-false}"
+
+    echo -e "${BLUE}Executing processes...${NC}"
+
+    local executed=0
+    local skipped=0
+
+    jq -r 'to_entries[] | "\(.key)|\(.value.cwd)|\(.value.processes[] | @base64)"' "$ENHANCED_STATE_FILE" 2>/dev/null | while IFS='|' read -r location cwd process_b64; do
+        if [ -z "$location" ]; then
+            continue
+        fi
+
+        # Decode process info
+        local process_json=$(echo "$process_b64" | base64 -d)
+        local command=$(echo "$process_json" | jq -r '.command' 2>/dev/null)
+        local auto_execute=$(echo "$process_json" | jq -r '.auto_execute' 2>/dev/null)
+        local proc_type=$(echo "$process_json" | jq -r '.type' 2>/dev/null)
+
+        # Skip shell processes unless auto mode is off and we want to execute everything
+        if [[ "$proc_type" == "shell" ]]; then
+            continue
+        fi
+
+        # Check if we should execute this process
+        local should_execute=false
+        if [ "$auto_only" = "true" ]; then
+            should_execute="$auto_execute"
+        else
+            should_execute="true"
+        fi
+
+        if [ "$should_execute" = "true" ]; then
+
+            # Parse location for tmux target
+            IFS=':' read -r session pane_id_temp <<< "$location"
+            IFS='.' read -r window pane <<< "$pane_id_temp"
+            local target="$session:$window.$pane"
+
+            # Check if target exists
+            if ! tmux has-session -t "$target" 2>/dev/null; then
+                echo -e "${RED}Target $target not found${NC}"
+                continue
+            fi
+
+            echo -e "${GREEN}[$target] Executing: $command${NC}"
+
+            if [ "$dry_run" = "false" ]; then
+                # Execute the command in the correct pane
+                tmux send-keys -t "$target" "cd '$cwd'" Enter
+                sleep 0.2
+                tmux send-keys -t "$target" "clear" Enter
+                sleep 0.1
+                tmux send-keys -t "$target" "$command" Enter
+
+                ((executed++))
+            else
+                echo -e "${YELLOW}[DRY RUN] Would execute in $target: $command${NC}"
+            fi
+        else
+            echo -e "${YELLOW}[$location] Skipping: $command (not auto-executable)${NC}"
+            ((skipped++))
+        fi
+    done
+}
+
+# Show summary of captured processes
+show_summary() {
+    if [ ! -f "$ENHANCED_STATE_FILE" ]; then
+        echo -e "${RED}No process data available. Run capture first.${NC}"
+        return 1
+    fi
+
+    echo -e "\n${BLUE}=== Process Summary ===${NC}"
+
+    local total_panes=$(jq '. | length' "$ENHANCED_STATE_FILE" 2>/dev/null || echo "0")
+    local total_processes=$(jq '[.[] | .processes | length] | add' "$ENHANCED_STATE_FILE" 2>/dev/null || echo "0")
+    local auto_processes=$(jq '[.[] | .processes[] | select(.auto_execute == true)] | length' "$ENHANCED_STATE_FILE" 2>/dev/null || echo "0")
+    local shell_processes=$(jq '[.[] | .processes[] | select(.type == "shell")] | length' "$ENHANCED_STATE_FILE" 2>/dev/null || echo "0")
+
+    echo "Total panes: $total_panes"
+    echo "Total processes: $total_processes"
+    echo "Auto-executable: $auto_processes"
+    echo "Shell processes: $shell_processes"
+
+    echo -e "\n${YELLOW}Processes by pane:${NC}"
+    jq -r 'to_entries[] | "\(.key): \(.value.processes | length) process(es)"' "$ENHANCED_STATE_FILE" 2>/dev/null
+
+    echo -e "\n${YELLOW}Auto-executable processes:${NC}"
+    jq -r 'to_entries[] | select(.value.processes[] | .auto_execute == true) | "\(.key): \([.value.processes[] | select(.auto_execute == true) | .command])"' "$ENHANCED_STATE_FILE" 2>/dev/null
+}
+
+# Main function
+main() {
+    case "${1:-capture}" in
+        "capture")
+            capture_actual_processes
+            show_summary
+            ;;
+        "auto")
+            capture_actual_processes
+            execute_processes true false
+            ;;
+        "all")
+            capture_actual_processes
+            execute_processes false false
+            ;;
+        "dry-auto")
+            capture_actual_processes
+            execute_processes true true
+            ;;
+        "dry-all")
+            capture_actual_processes
+            execute_processes false true
+            ;;
+        "summary")
+            show_summary
+            ;;
+        *)
+            echo "Usage: $0 {capture|auto|all|dry-auto|dry-all|summary}"
+            echo ""
+            echo "Commands:"
+            echo "  capture   - Capture current running processes"
+            echo "  auto      - Capture and auto-execute whitelisted processes"
+            echo "  all       - Capture and execute all processes"
+            echo "  dry-auto  - Dry run for auto-executable processes"
+            echo "  dry-all   - Dry run for all processes"
+            echo "  summary   - Show process summary"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

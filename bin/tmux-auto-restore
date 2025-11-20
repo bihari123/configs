@@ -1,0 +1,191 @@
+#!/bin/bash
+
+# Auto-restore processes during tmux-resurrect restoration
+# This script hooks into tmux-resurrect's restore process
+
+ENHANCED_STATE_FILE="$HOME/.tmux/resurrect/restore_state.json"
+
+# Auto-execution whitelist (same as your config)
+AUTO_PROCESSES=("ssh" "psql" "mysql" "sqlite3" "npm start" "npm run dev" "python" "python3" "node" "go run" "cargo run" "btop" "htop" "top" "vim" "nvim" "vi")
+
+# Capture current running processes for restore
+capture_for_restore() {
+    # Quick check if there are any non-shell processes to capture
+    local has_processes=false
+    while IFS= read -r pane_pid; do
+        if [ -n "$pane_pid" ] && [ "$pane_pid" != "0" ]; then
+            local child_cmd=$(pgrep -P "$pane_pid" -l 2>/dev/null | head -1 | awk '{print $2}')
+            if [ -n "$child_cmd" ] && [[ ! "$child_cmd" =~ ^(bash|sh|zsh|fish)$ ]]; then
+                has_processes=true
+                break
+            fi
+        fi
+    done < <(tmux list-panes -a -F "#{pane_pid}")
+
+    # If no processes found, clean up and exit silently
+    if [ "$has_processes" = "false" ]; then
+        rm -f "$ENHANCED_STATE_FILE"
+        return 0
+    fi
+
+    # Only show message if we're actually capturing something
+    echo -e "\033[0;34mCapturing processes for restore...\033[0m"
+
+    # Create JSON of current processes
+    echo "[" > "$ENHANCED_STATE_FILE"
+
+    local first=true
+    tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index}|#{pane_id}|#{pane_current_path}|#{pane_title}|#{pane_pid}" | while IFS='|' read -r location pane_id cwd title pane_pid; do
+        if [ "$first" = false ]; then
+            echo "," >> "$ENHANCED_STATE_FILE"
+        fi
+        first=false
+
+        # Find processes for this pane
+        local process_to_restore=""
+        local is_auto=false
+        local process_type=""
+
+        if [ -n "$pane_pid" ] && [ "$pane_pid" != "0" ]; then
+            # Check for child processes first (like btop)
+            local child_cmd=$(pgrep -P "$pane_pid" -l 2>/dev/null | head -1 | awk '{print $2}')
+            if [ -n "$child_cmd" ]; then
+                process_to_restore="$child_cmd"
+            else
+                # Fall back to main process
+                local main_cmd=$(ps -p "$pane_pid" -o cmd --no-headers 2>/dev/null | xargs)
+                process_to_restore="$main_cmd"
+            fi
+        fi
+
+        # Skip if it's just a shell or empty
+        if [[ -z "$process_to_restore" ]] || [[ "$process_to_restore" =~ ^bash$|^sh$|^zsh$|^fish$ ]] || [[ "$process_to_restore" =~ ^-/bin/.*$ ]] || [[ "$process_to_restore" =~ ^/usr/bin/.*$ ]]; then
+            continue
+        fi
+
+        # Check if this should auto-execute
+        for auto_proc in "${AUTO_PROCESSES[@]}"; do
+            if [[ "$process_to_restore" == *"$auto_proc"* ]]; then
+                is_auto=true
+                process_type="$auto_proc"
+                break
+            fi
+        done
+
+        # Parse location
+        IFS=':' read -r session pane_id_temp <<< "$location"
+        IFS='.' read -r window pane <<< "$pane_id_temp"
+
+        cat >> "$ENHANCED_STATE_FILE" << EOF
+{
+  "location": "$location",
+  "session": "$session",
+  "window": "$window",
+  "pane": "$pane",
+  "cwd": "$cwd",
+  "title": "$title",
+  "process": "$process_to_restore",
+  "auto_execute": $is_auto,
+  "process_type": "$process_type"
+}
+EOF
+    done
+
+    echo "]" >> "$ENHANCED_STATE_FILE"
+}
+
+# Execute processes during restore - this runs during tmux-resurrect restore
+execute_restore() {
+    if [ ! -f "$ENHANCED_STATE_FILE" ]; then
+        return 0
+    fi
+
+    echo -e "\033[0;32mRestoring processes...\033[0m"
+
+    # Wait a moment for tmux-resurrect to finish setting up panes
+    sleep 1
+
+    jq -c '.[]' "$ENHANCED_STATE_FILE" 2>/dev/null | while IFS= read -r entry; do
+        local location=$(echo "$entry" | jq -r '.location')
+        local cwd=$(echo "$entry" | jq -r '.cwd')
+        local process=$(echo "$entry" | jq -r '.process')
+        local auto_exec=$(echo "$entry" | jq -r '.auto_execute')
+
+        if [ -z "$process" ] || [ "$process" = "null" ]; then
+            continue
+        fi
+
+        # Parse target
+        IFS=':' read -r session window_pane <<< "$location"
+        IFS='.' read -r window pane <<< "$window_pane"
+        local target="$session:$window.$pane"
+
+        # Wait for target to be available
+        local count=0
+        while ! tmux has-session -t "$target" 2>/dev/null && [ $count -lt 10 ]; do
+            sleep 0.5
+            ((count++))
+        done
+
+        if ! tmux has-session -t "$target" 2>/dev/null; then
+            continue
+        fi
+
+        # Execute based on auto-execution flag
+        if [ "$auto_exec" = "true" ]; then
+            # Auto-execute immediately
+            echo -e "\033[0;32mAuto-executing $process in $target\033[0m"
+            tmux send-keys -t "$target" "cd '$cwd'" Enter
+            sleep 0.2
+            tmux send-keys -t "$target" "clear" Enter
+            sleep 0.1
+            tmux send-keys -t "$target" "$process" Enter
+        else
+            # Pre-populate command line for manual execution
+            echo -e "\033[0;33mPre-populating $process in $target\033[0m"
+            tmux send-keys -t "$target" "cd '$cwd'" Enter
+            sleep 0.2
+            tmux send-keys -t "$target" "clear" Enter
+            sleep 0.1
+            tmux send-keys -t "$target" "$process"
+            # Don't press Enter - user needs to press it
+        fi
+    done
+}
+
+# Pre-restore hook - this runs before tmux-resurrect starts restoring
+pre_restore() {
+    # Just clean up any old state
+    rm -f "$ENHANCED_STATE_FILE"
+}
+
+# Post-restore hook - this runs after tmux-resurrect finishes restoring
+post_restore() {
+    # Execute our process restoration
+    execute_restore
+
+    # Show summary
+    echo -e "\033[0;34mProcess restoration complete!\033[0m"
+    echo -e "Press Enter in any pane with pre-populated commands to execute them."
+}
+
+# Main - determine what we're doing based on how we're called
+case "${1:-auto}" in
+    "pre-restore")
+        pre_restore
+        ;;
+    "post-restore")
+        post_restore
+        ;;
+    "capture")
+        capture_for_restore
+        ;;
+    "execute")
+        execute_restore
+        ;;
+    *)
+        # Default: capture and execute in one go
+        capture_for_restore
+        execute_restore
+        ;;
+esac

@@ -1,0 +1,29 @@
+#!/bin/bash
+
+echo "=== DEBUG: Current tmux processes ==="
+echo ""
+
+echo "All panes with their current commands:"
+tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index} | #{pane_current_command} | #{pane_current_path} | #{pane_title} | #{pane_pid}"
+echo ""
+
+echo "=== Checking for actual running processes ==="
+tmux list-panes -a -F "#{pane_pid}" | while read -r pid; do
+    if [ -n "$pid" ] && [ "$pid" != "0" ]; then
+        echo "PID $pid:"
+        ps -p "$pid" -o pid,ppid,cmd --no-headers 2>/dev/null
+        echo ""
+        echo "Children:"
+        pgrep -P "$pid" -l 2>/dev/null || echo "  No children"
+        echo "---"
+    fi
+done
+
+echo ""
+echo "=== Current resurrect file ==="
+if [ -f "$HOME/.tmux/resurrect/last" ]; then
+    echo "Last resurrect state:"
+    head -10 "$HOME/.tmux/resurrect/last"
+else
+    echo "No resurrect file found"
+fi

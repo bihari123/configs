@@ -1,0 +1,112 @@
+#!/bin/bash
+
+# Tmux startup process restorer
+# Runs when tmux starts (after restore is complete)
+
+RESTORE_STATE_FILE="$HOME/.tmux/resurrect/restore_state.json"
+LOG_FILE="$HOME/.tmux/resurrect/startup_restore.log"
+
+# Auto-execution whitelist
+AUTO_PROCESSES=("btop" "htop" "top" "npm" "node" "python" "python3" "go" "cargo" "ssh" "psql" "mysql" "sqlite3" "vim" "nvim" "vi")
+
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
+}
+
+restore_processes() {
+    log_message "Starting process restoration check"
+
+    if [ ! -f "$RESTORE_STATE_FILE" ]; then
+        log_message "No restore state file found"
+        return 0
+    fi
+
+    log_message "Processing restore state file"
+    local restored_count=0
+
+    jq -c '.[]' "$RESTORE_STATE_FILE" 2>/dev/null | while IFS= read -r entry; do
+        local location=$(echo "$entry" | jq -r '.location')
+        local cwd=$(echo "$entry" | jq -r '.cwd')
+        local process=$(echo "$entry" | jq -r '.process')
+        local auto_exec=$(echo "$entry" | jq -r '.auto_execute')
+
+        if [ -z "$process" ] || [ "$process" = "null" ]; then
+            log_message "No process found for $location"
+            continue
+        fi
+
+        # Skip shell processes
+        if [[ "$process" =~ ^(bash|sh|zsh|fish|/bin/|/usr/bin/) ]]; then
+            log_message "Skipping shell process: $process"
+            continue
+        fi
+
+        # Parse target location
+        IFS=':' read -r session window_pane <<< "$location"
+        IFS='.' read -r window pane <<< "$window_pane"
+        local target="$session:$window.$pane"
+
+        log_message "Checking target: $target for process: $process"
+
+        # Wait for tmux session to be ready
+        local wait_count=0
+        while ! tmux has-session -t "$target" 2>/dev/null && [ $wait_count -lt 30 ]; do
+            sleep 1
+            ((wait_count++))
+            log_message "Waiting for target $target (attempt $wait_count)"
+        done
+
+        if ! tmux has-session -t "$target" 2>/dev/null; then
+            log_message "Target $target not available after waiting"
+            continue
+        fi
+
+        # Check if process is already running in this pane
+        local current_cmd=$(tmux display-message -p -t "$target" "#{pane_current_command}")
+        log_message "Current command in $target: $current_cmd"
+
+        # Auto-execute or pre-populate based on flag
+        if [ "$auto_exec" = "true" ]; then
+            log_message "Auto-executing $process in $target"
+
+            # Change to correct directory
+            tmux send-keys -t "$target" "cd '$cwd'" Enter
+            sleep 0.3
+
+            # Clear screen
+            tmux send-keys -t "$target" "clear" Enter
+            sleep 0.2
+
+            # Execute the process
+            tmux send-keys -t "$target" "$process" Enter
+
+            ((restored_count++))
+            log_message "Executed: $process in $target"
+        else
+            log_message "Pre-populating $process in $target"
+
+            # Change to correct directory
+            tmux send-keys -t "$target" "cd '$cwd'" Enter
+            sleep 0.3
+
+            # Clear screen and pre-populate command
+            tmux send-keys -t "$target" "clear" Enter
+            sleep 0.2
+            tmux send-keys -t "$target" "$process"
+
+            log_message "Pre-populated: $process in $target"
+        fi
+    done
+
+    log_message "Process restoration completed. Restored $restored_count processes."
+
+    # Clean up the restore state file after processing
+    sleep 2
+    rm -f "$RESTORE_STATE_FILE"
+    log_message "Cleaned up restore state file"
+}
+
+# Main execution
+log_message "Tmux startup restore initiated"
+restore_processes
+log_message "Tmux startup restore finished"

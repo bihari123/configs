@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# Fixed process restoration system
+# Simple and reliable
+
+STATE_FILE="$HOME/.tmux/resurrect/fixed_restore.json"
+LOG_FILE="$HOME/.tmux/resurrect/restore.log"
+
+log() {
+    echo "$(date) $1" >> "$LOG_FILE"
+}
+
+# Capture running processes
+capture() {
+    log "Starting process capture"
+
+    # Only capture if we have non-shell processes
+    local has_processes=false
+    while IFS= read -r pane_pid; do
+        if [ -n "$pane_pid" ] && [ "$pane_pid" != "0" ]; then
+            local child_cmd=$(pgrep -P "$pane_pid" 2>/dev/null | head -1 | xargs ps -p -o cmd --no-headers 2>/dev/null | xargs)
+            if [ -n "$child_cmd" ] && [[ ! "$child_cmd" =~ ^(bash|sh|zsh|fish) ]]; then
+                has_processes=true
+                break
+            fi
+        fi
+    done < <(tmux list-panes -a -F "#{pane_pid}")
+
+    if [ "$has_processes" = "false" ]; then
+        log "No processes to capture"
+        rm -f "$STATE_FILE"
+        return 0
+    fi
+
+    log "Capturing processes"
+
+    # Simple CSV format: location|cwd|process|auto_execute
+    > "$STATE_FILE"
+    tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index}|#{pane_current_path}|#{pane_pid}" | while IFS='|' read -r location cwd pane_pid; do
+        if [ -n "$pane_pid" ] && [ "$pane_pid" != "0" ]; then
+            # Find child processes
+            pgrep -P "$pane_pid" 2>/dev/null | while read -r child_pid; do
+                if [ -n "$child_pid" ]; then
+                    local cmd=$(ps -p "$child_pid" -o cmd --no-headers 2>/dev/null | xargs)
+                    if [ -n "$cmd" ] && [[ ! "$cmd" =~ ^(bash|sh|zsh|fish) ]]; then
+                        # Check if auto-executable
+                        local auto_exec="false"
+                        case "$cmd" in
+                            *btop*|*htop*|*top*|*npm*|*node*|*python*|*go*|*cargo*|*ssh*|*psql*|*mysql*|*sqlite3*|*vim*|*nvim*|*vi*)
+                                auto_exec="true"
+                                ;;
+                        esac
+                        echo "$location|$cwd|$cmd|$auto_exec" >> "$STATE_FILE"
+                        log "Captured: $cmd in $location (auto: $auto_exec)"
+                    fi
+                fi
+            done
+        fi
+    done
+}
+
+# Restore processes
+restore() {
+    log "Starting process restoration"
+
+    if [ ! -f "$STATE_FILE" ]; then
+        log "No state file found"
+        return 0
+    fi
+
+    local restored=0
+    while IFS='|' read -r location cwd process auto_exec; do
+        if [ -z "$process" ]; then
+            continue
+        fi
+
+        # Parse location
+        IFS=':' read -r session pane_loc <<< "$location"
+        IFS='.' read -r window pane <<< "$pane_loc"
+        local target="$session:$window.$pane"
+
+        # Wait for target
+        local count=0
+        while ! tmux has-session -t "$target" 2>/dev/null && [ $count -lt 10 ]; do
+            sleep 1
+            ((count++))
+        done
+
+        if ! tmux has-session -t "$target" 2>/dev/null; then
+            log "Target $target not found"
+            continue
+        fi
+
+        log "Restoring $process to $target (auto: $auto_exec)"
+
+        # Change directory
+        tmux send-keys -t "$target" "cd '$cwd'" Enter
+        sleep 0.3
+        tmux send-keys -t "$target" "clear" Enter
+        sleep 0.2
+
+        if [ "$auto_exec" = "true" ]; then
+            # Auto-execute
+            tmux send-keys -t "$target" "$process" Enter
+            log "Auto-executed: $process"
+            ((restored++))
+        else
+            # Pre-populate
+            tmux send-keys -t "$target" "$process"
+            log "Pre-populated: $process"
+        fi
+    done < "$STATE_FILE"
+
+    log "Restored $restored processes"
+
+    # Clean up after delay
+    sleep 5
+    rm -f "$STATE_FILE"
+    log "Cleaned up state file"
+}
+
+# Main
+case "${1:-capture}" in
+    "capture")
+        capture
+        ;;
+    "restore")
+        restore
+        ;;
+    *)
+        echo "Usage: $0 {capture|restore}"
+        ;;
+esac

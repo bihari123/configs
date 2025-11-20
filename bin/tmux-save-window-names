@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Script to save tmux window names for tmux-resurrect
+# This script captures window names from ALL sessions and stores them for later restoration
+
+WINDOW_NAMES_FILE="$HOME/.tmux/resurrect/window_names.txt"
+
+# Create resurrect directory if it doesn't exist
+mkdir -p "$(dirname "$WINDOW_NAMES_FILE")"
+
+# Clear the file first
+> "$WINDOW_NAMES_FILE"
+
+# Save window names for ALL sessions
+tmux list-sessions | while read -r session_line; do
+    session_name=$(echo "$session_line" | cut -d: -f1)
+
+    # Skip if session name is empty
+    if [[ -z "$session_name" ]]; then
+        continue
+    fi
+
+    echo "# Session: $session_name" >> "$WINDOW_NAMES_FILE"
+
+    # Save windows for this session with session prefix (use | as delimiter since session names can't contain it)
+    tmux list-windows -t "$session_name" -F "${session_name}|#{window_index}|#{window_name}" >> "$WINDOW_NAMES_FILE"
+done
+
+# Silent operation - only show minimal output
+echo "Window names saved ($(wc -l < "$WINDOW_NAMES_FILE") entries)" 2>/dev/null || true
