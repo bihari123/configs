@@ -16,8 +16,13 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             echo "Usage: $0 [-w|--webcam] [--webcam-device DEVICE]"
+            echo ""
+            echo "Record your screen or a specific window with optional webcam overlay."
+            echo ""
+            echo "Options:"
             echo "  -w, --webcam          Enable webcam overlay in bottom right"
             echo "  --webcam-device       Specify webcam device (default: /dev/video0)"
+            echo "  -h, --help            Show this help message"
             exit 0
             ;;
         *)
@@ -28,19 +33,132 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Get all connected displays with full info
-mapfile -t DISPLAY_LINES < <(xrandr --query | grep " connected")
+# Ask user for recording mode
+echo "Recording mode:"
+echo "  1. Whole screen"
+echo "  2. Window"
+echo ""
 
-if [ ${#DISPLAY_LINES[@]} -eq 0 ]; then
-    echo "Error: No connected displays found"
-    exit 1
-fi
+while true; do
+    read -p "Choose recording mode (1-2): " MODE_CHOICE
+    if [[ "$MODE_CHOICE" == "1" ]]; then
+        RECORDING_MODE="screen"
+        break
+    elif [[ "$MODE_CHOICE" == "2" ]]; then
+        RECORDING_MODE="window"
+        break
+    else
+        echo "Invalid choice. Please enter 1 or 2"
+    fi
+done
 
-# Parse display information
-DISPLAYS=()
-RESOLUTIONS=()
-ROTATIONS=()
-SIZES=()
+if [ "$RECORDING_MODE" = "window" ]; then
+    # List all windows
+    echo ""
+    echo "Detecting windows..."
+
+    # Try wmctrl first (cleaner output), fall back to xwininfo
+    if command -v wmctrl &> /dev/null; then
+        # Use wmctrl for cleaner window list
+        mapfile -t WINDOW_IDS < <(wmctrl -l | awk '{print $1}')
+        mapfile -t WINDOW_NAMES < <(wmctrl -l | cut -d' ' -f5-)
+
+        if [ ${#WINDOW_IDS[@]} -eq 0 ]; then
+            echo "Error: No windows found"
+            exit 1
+        fi
+    elif command -v xwininfo &> /dev/null; then
+        # Fall back to xwininfo with better filtering
+        # Get all window info at once
+        WINDOW_TREE=$(xwininfo -root -tree)
+
+        # Arrays to collect valid windows
+        WINDOW_IDS=()
+        WINDOW_NAMES=()
+
+        # Parse each line and filter
+        while IFS= read -r line; do
+            # Skip if doesn't match window format
+            if ! echo "$line" | grep -qE '^\s+0x[0-9a-f]+'; then
+                continue
+            fi
+
+            # Extract window ID
+            WID=$(echo "$line" | awk '{print $1}')
+
+            # Extract window name (between quotes)
+            WNAME=$(echo "$line" | sed -n 's/.*"\(.*\)".*/\1/p')
+
+            # Skip if no name or has problematic patterns
+            if [ -z "$WNAME" ] || \
+               [[ "$WNAME" == *"has no name"* ]] || \
+               [[ "$WNAME" == "Desktop" ]] || \
+               [[ "$WNAME" == "xfce4-panel" ]] || \
+               [[ "$WNAME" == "Plank" ]]; then
+                continue
+            fi
+
+            # Extract geometry
+            GEOM=$(echo "$line" | grep -oE '[0-9]+x[0-9]+')
+
+            # Skip 1x1 windows (likely hidden/system windows)
+            if [ "$GEOM" = "1x1" ]; then
+                continue
+            fi
+
+            # Skip if no geometry found
+            if [ -z "$GEOM" ]; then
+                continue
+            fi
+
+            # This is a valid window, add it
+            WINDOW_IDS+=("$WID")
+            WINDOW_NAMES+=("$WNAME")
+        done <<< "$WINDOW_TREE"
+
+        if [ ${#WINDOW_IDS[@]} -eq 0 ]; then
+            echo "Error: No windows found"
+            exit 1
+        fi
+    else
+        echo "Error: Neither wmctrl nor xwininfo found. Please install wmctrl or x11-utils package."
+        exit 1
+    fi
+
+    # Show available windows
+    echo "Available windows:"
+    for i in "${!WINDOW_IDS[@]}"; do
+        echo "  $((i+1)). ${WINDOW_NAMES[$i]}"
+    done
+    echo ""
+
+    # Ask user to choose
+    while true; do
+        read -p "Choose window to record (1-${#WINDOW_IDS[@]}): " WINDOW_CHOICE
+        if [[ "$WINDOW_CHOICE" =~ ^[0-9]+$ ]] && [ "$WINDOW_CHOICE" -ge 1 ] && [ "$WINDOW_CHOICE" -le ${#WINDOW_IDS[@]} ]; then
+            SELECTED_WINDOW_ID="${WINDOW_IDS[$((WINDOW_CHOICE-1))]}"
+            SELECTED_WINDOW_NAME="${WINDOW_NAMES[$((WINDOW_CHOICE-1))]}"
+            break
+        else
+            echo "Invalid choice. Please enter a number between 1 and ${#WINDOW_IDS[@]}"
+        fi
+    done
+
+    echo "Selected window: $SELECTED_WINDOW_NAME ($SELECTED_WINDOW_ID)"
+else
+    # Get all connected displays with full info
+    mapfile -t DISPLAY_LINES < <(xrandr --query | grep " connected")
+
+    if [ ${#DISPLAY_LINES[@]} -eq 0 ]; then
+        echo "Error: No connected displays found"
+        exit 1
+    fi
+
+    # Parse display information
+    DISPLAYS=()
+    RESOLUTIONS=()
+    ROTATIONS=()
+    SIZES=()
 
 for line in "${DISPLAY_LINES[@]}"; do
     # Extract display name
@@ -99,27 +217,57 @@ else
             echo "Invalid choice. Please enter a number between 1 and ${#DISPLAYS[@]}"
         fi
     done
+    fi
+
+    # Get selected display info
+    PRIMARY_DISPLAY="${DISPLAYS[$SELECTED_INDEX]}"
+    RESOLUTION="${RESOLUTIONS[$SELECTED_INDEX]}"
+
+    if [ -z "$RESOLUTION" ]; then
+        echo "Error: Could not get resolution for $PRIMARY_DISPLAY"
+        exit 1
+    fi
+
+    # Extract geometry
+    GEOMETRY=$(echo $RESOLUTION | cut -d'+' -f1)
+    OFFSET=$(echo $RESOLUTION | cut -d'+' -f2-3 | tr '+' ',')
 fi
 
-# Get selected display info
-PRIMARY_DISPLAY="${DISPLAYS[$SELECTED_INDEX]}"
-RESOLUTION="${RESOLUTIONS[$SELECTED_INDEX]}"
+# Get geometry based on recording mode
+if [ "$RECORDING_MODE" = "window" ]; then
+    # Get window geometry
+    WINDOW_INFO=$(xwininfo -id "$SELECTED_WINDOW_ID")
 
-if [ -z "$RESOLUTION" ]; then
-    echo "Error: Could not get resolution for $PRIMARY_DISPLAY"
-    exit 1
+    # Extract absolute position and dimensions
+    ABS_X=$(echo "$WINDOW_INFO" | grep "Absolute upper-left X:" | awk '{print $4}')
+    ABS_Y=$(echo "$WINDOW_INFO" | grep "Absolute upper-left Y:" | awk '{print $4}')
+    WIDTH=$(echo "$WINDOW_INFO" | grep "Width:" | awk '{print $2}')
+    HEIGHT=$(echo "$WINDOW_INFO" | grep "Height:" | awk '{print $2}')
+
+    if [ -z "$WIDTH" ] || [ -z "$HEIGHT" ]; then
+        echo "Error: Could not get window geometry"
+        exit 1
+    fi
+
+    GEOMETRY="${WIDTH}x${HEIGHT}"
+    OFFSET="${ABS_X},${ABS_Y}"
+
+    echo "Window geometry: ${GEOMETRY} at offset ${OFFSET}"
 fi
-
-# Extract geometry
-GEOMETRY=$(echo $RESOLUTION | cut -d'+' -f1)
-OFFSET=$(echo $RESOLUTION | cut -d'+' -f2-3 | tr '+' ',')
 
 # Detect display capabilities
 echo "Detecting display capabilities..."
 
 # Get the full xrandr line for the selected display to extract refresh rate
-DISPLAY_INFO=$(xrandr --query | grep "^${PRIMARY_DISPLAY} connected")
-CURRENT_MODE=$(xrandr --query | grep "^${PRIMARY_DISPLAY}" -A 20 | grep '\*' | head -1)
+if [ "$RECORDING_MODE" = "screen" ]; then
+    DISPLAY_INFO=$(xrandr --query | grep "^${PRIMARY_DISPLAY} connected")
+    CURRENT_MODE=$(xrandr --query | grep "^${PRIMARY_DISPLAY}" -A 20 | grep '\*' | head -1)
+else
+    # For window mode, get info from the primary/first connected display
+    DISPLAY_INFO=$(xrandr --query | grep " connected" | head -1)
+    DISPLAY_NAME=$(echo "$DISPLAY_INFO" | cut -d" " -f1)
+    CURRENT_MODE=$(xrandr --query | grep "^${DISPLAY_NAME}" -A 20 | grep '\*' | head -1)
+fi
 
 # Extract refresh rate from current mode (e.g., "1920x1080 60.00*+")
 DISPLAY_REFRESH=$(echo "$CURRENT_MODE" | grep -oP '[0-9]+\.[0-9]+(?=\*)')
@@ -314,7 +462,11 @@ while true; do
     fi
 done
 
-echo "Recording primary display: $PRIMARY_DISPLAY"
+if [ "$RECORDING_MODE" = "screen" ]; then
+    echo "Recording primary display: $PRIMARY_DISPLAY"
+else
+    echo "Recording window: $SELECTED_WINDOW_NAME"
+fi
 echo "Resolution: $GEOMETRY"
 echo "Offset: $OFFSET"
 echo "Output file: $OUTPUT_FILE"
