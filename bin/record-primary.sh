@@ -249,6 +249,11 @@ if [ "$RECORDING_MODE" = "window" ]; then
         exit 1
     fi
 
+    # Ensure dimensions are divisible by 2 (required for H.264 encoding)
+    # Round down to nearest even number
+    WIDTH=$((WIDTH - (WIDTH % 2)))
+    HEIGHT=$((HEIGHT - (HEIGHT % 2)))
+
     GEOMETRY="${WIDTH}x${HEIGHT}"
     OFFSET="${ABS_X},${ABS_Y}"
 
