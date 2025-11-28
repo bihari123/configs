@@ -262,9 +262,57 @@ fi
 # Always use display fps for recording
 RECORDING_FPS=$DISPLAY_FPS
 
-# Generate filename with timestamp
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-OUTPUT_FILE="recording_${TIMESTAMP}.mp4"
+# Detect and select audio input device
+echo ""
+echo "Detecting audio input devices..."
+
+# Get list of pulse audio sources
+mapfile -t AUDIO_SOURCES < <(pactl list sources short | awk '{print $2}')
+mapfile -t AUDIO_DESCRIPTIONS < <(pactl list sources | grep -E "Name:|Description:" | paste - - | sed 's/.*Name: //' | sed 's/Description: /- /')
+
+if [ ${#AUDIO_SOURCES[@]} -eq 0 ]; then
+    echo "Warning: No audio sources found, using default"
+    AUDIO_DEVICE="default"
+else
+    # Show available audio sources
+    echo "Available audio input devices:"
+    for i in "${!AUDIO_SOURCES[@]}"; do
+        echo "  $((i+1)). ${AUDIO_DESCRIPTIONS[$i]}"
+    done
+    echo ""
+
+    # Ask user to choose
+    while true; do
+        read -p "Choose audio input device (1-${#AUDIO_SOURCES[@]}): " AUDIO_CHOICE
+        if [[ "$AUDIO_CHOICE" =~ ^[0-9]+$ ]] && [ "$AUDIO_CHOICE" -ge 1 ] && [ "$AUDIO_CHOICE" -le ${#AUDIO_SOURCES[@]} ]; then
+            AUDIO_DEVICE="${AUDIO_SOURCES[$((AUDIO_CHOICE-1))]}"
+            break
+        else
+            echo "Invalid choice. Please enter a number between 1 and ${#AUDIO_SOURCES[@]}"
+        fi
+    done
+
+    echo "Selected audio device: $AUDIO_DEVICE"
+fi
+
+# Ask user for output filename
+while true; do
+    read -p "Enter output filename (without .mp4 extension): " FILENAME
+
+    # Add .mp4 extension if not provided
+    if [[ "$FILENAME" != *.mp4 ]]; then
+        OUTPUT_FILE="${FILENAME}.mp4"
+    else
+        OUTPUT_FILE="$FILENAME"
+    fi
+
+    # Check if file already exists
+    if [ -e "$OUTPUT_FILE" ]; then
+        echo "Error: File '$OUTPUT_FILE' already exists. Please choose a different name."
+    else
+        break
+    fi
+done
 
 echo "Recording primary display: $PRIMARY_DISPLAY"
 echo "Resolution: $GEOMETRY"
@@ -281,14 +329,14 @@ if [ "$WEBCAM_ENABLED" = true ]; then
 
     ffmpeg -f x11grab -framerate $DISPLAY_FPS -probesize 42M -draw_mouse 0 -thread_queue_size 512 -s $GEOMETRY -i :0.0+$OFFSET \
       -f v4l2 $FORMAT_FLAG -video_size $WEBCAM_RESOLUTION -framerate $WEBCAM_FPS -thread_queue_size 512 -i "$WEBCAM_DEVICE" \
-      -f pulse -thread_queue_size 512 -i default \
+      -f pulse -thread_queue_size 512 -i "$AUDIO_DEVICE" \
       -filter_complex "[1:v]scale=${WEBCAM_WIDTH}:-1,fps=${RECORDING_FPS}[webcam]; \
                        [0:v][webcam]overlay=W-w-${PADDING}:H-h-${PADDING}[outv]" \
       -map "[outv]" -map 2:a \
       -c:v libx264 -preset slow -tune film -crf 18 -pix_fmt yuv420p \
       -r $RECORDING_FPS -g $((RECORDING_FPS * 2)) \
       -threads 0 -x264-params keyint=$((RECORDING_FPS*4)):min-keyint=$((RECORDING_FPS)):ref=5:bframes=3 \
-      -vsync cfr \
+      -fps_mode cfr \
       -af "afftdn=nf=-25,highpass=f=200" \
       -c:a aac -ar 48000 -ac 2 -b:a 128k \
       -movflags +faststart \
@@ -296,11 +344,11 @@ if [ "$WEBCAM_ENABLED" = true ]; then
 else
     # Without webcam
     ffmpeg -f x11grab -framerate $DISPLAY_FPS -probesize 42M -draw_mouse 0 -thread_queue_size 512 -s $GEOMETRY -i :0.0+$OFFSET \
-      -f pulse -thread_queue_size 512 -i default \
+      -f pulse -thread_queue_size 512 -i "$AUDIO_DEVICE" \
       -c:v libx264 -preset slow -tune film -crf 18 -pix_fmt yuv420p \
       -r $RECORDING_FPS -g $((RECORDING_FPS * 2)) \
       -threads 0 -x264-params keyint=$((RECORDING_FPS*4)):min-keyint=$((RECORDING_FPS)):ref=5:bframes=3 \
-      -vsync cfr \
+      -fps_mode cfr \
       -af "afftdn=nf=-25,highpass=f=200" \
       -c:a aac -ar 48000 -ac 2 -b:a 128k \
       -movflags +faststart \
