@@ -240,19 +240,27 @@ install_modern_cli_tools() {
 install_rust_tools() {
     step "Installing Rust and Rust-based tools"
 
-    # Install Rust if not present
-    if ! command_exists cargo; then
+    # Install Rust if not present, or update if already installed
+    if command_exists cargo; then
+        CURRENT_RUST=$(rustc --version 2>/dev/null | awk '{print $2}' || echo "unknown")
+        info "Rust already installed: $CURRENT_RUST"
+        info "Checking for updates..."
+        rustup update stable 2>/dev/null || info "Rust is up to date"
+    else
         info "Installing Rust..."
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source "$HOME/.cargo/env"
+        success "Rust installed"
     fi
 
     # Install Rust tools if not available from system packages
     if ! command_exists btop && ! command_exists bottom; then
+        info "Installing bottom (btm)..."
         cargo install bottom || true
     fi
 
     if ! command_exists dust; then
+        info "Installing dust..."
         cargo install du-dust || true
     fi
 
@@ -261,7 +269,7 @@ install_rust_tools() {
         true
     fi
 
-    success "Rust tools installed"
+    success "Rust tools installation completed"
 }
 
 install_binary_tools() {
@@ -270,61 +278,83 @@ install_binary_tools() {
     mkdir -p ~/.local/bin
 
     # Install duf (Go)
-    if ! command_exists duf; then
-        info "Installing duf..."
-        DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+    DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
-        if [ -z "$DUF_VERSION" ]; then
-            warning "Could not fetch duf version from GitHub API, skipping..."
+    if [ -z "$DUF_VERSION" ]; then
+        warning "Could not fetch duf version from GitHub API, skipping..."
+    else
+        if command_exists duf; then
+            CURRENT_VERSION=$(duf --version 2>/dev/null | grep -oP 'duf version \K[0-9.]+' || echo "unknown")
+            if [ "$CURRENT_VERSION" = "$DUF_VERSION" ]; then
+                info "duf already at latest version: $CURRENT_VERSION"
+            else
+                info "Updating duf from $CURRENT_VERSION to $DUF_VERSION..."
+                if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
+                    tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
+                    if [ -f /tmp/duf ]; then
+                        mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
+                        chmod +x ~/.local/bin/duf 2>/dev/null || true
+                        success "duf updated to $DUF_VERSION"
+                    fi
+                    rm -f /tmp/duf.tar.gz
+                else
+                    warning "Failed to download duf, skipping..."
+                fi
+            fi
         else
+            info "Installing duf..."
             if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
                 tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
                 if [ -f /tmp/duf ]; then
                     mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
                     chmod +x ~/.local/bin/duf 2>/dev/null || true
+                    success "duf installed"
                 fi
                 rm -f /tmp/duf.tar.gz
-
-                if command_exists duf; then
-                    success "duf installed"
-                else
-                    warning "duf installation failed"
-                fi
             else
                 warning "Failed to download duf, skipping..."
             fi
         fi
-    else
-        info "duf already installed"
     fi
 
     # Install lazygit
-    if ! command_exists lazygit; then
-        info "Installing lazygit..."
-        LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
-        if [ -z "$LAZYGIT_VERSION" ]; then
-            warning "Could not fetch lazygit version from GitHub API, skipping..."
+    if [ -z "$LAZYGIT_VERSION" ]; then
+        warning "Could not fetch lazygit version from GitHub API, skipping..."
+    else
+        if command_exists lazygit; then
+            CURRENT_VERSION=$(lazygit --version 2>/dev/null | grep -oP 'version=\K[0-9.]+' || echo "unknown")
+            if [ "$CURRENT_VERSION" = "$LAZYGIT_VERSION" ]; then
+                info "lazygit already at latest version: $CURRENT_VERSION"
+            else
+                info "Updating lazygit from $CURRENT_VERSION to $LAZYGIT_VERSION..."
+                if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
+                    tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
+                    if [ -f /tmp/lazygit ]; then
+                        mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
+                        chmod +x ~/.local/bin/lazygit 2>/dev/null || true
+                        success "lazygit updated to $LAZYGIT_VERSION"
+                    fi
+                    rm -f /tmp/lazygit.tar.gz
+                else
+                    warning "Failed to download lazygit, skipping..."
+                fi
+            fi
         else
+            info "Installing lazygit..."
             if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
                 tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
                 if [ -f /tmp/lazygit ]; then
                     mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
                     chmod +x ~/.local/bin/lazygit 2>/dev/null || true
+                    success "lazygit installed"
                 fi
                 rm -f /tmp/lazygit.tar.gz
-
-                if command_exists lazygit; then
-                    success "lazygit installed"
-                else
-                    warning "lazygit installation failed"
-                fi
             else
                 warning "Failed to download lazygit, skipping..."
             fi
         fi
-    else
-        info "lazygit already installed"
     fi
 
     success "Binary tools installation completed"
@@ -337,11 +367,14 @@ install_binary_tools() {
 install_zoxide() {
     step "Installing zoxide"
 
-    if ! command_exists zoxide; then
+    if command_exists zoxide; then
+        info "zoxide already installed: $(zoxide --version 2>/dev/null || echo 'version unknown')"
+        # The zoxide installer handles updates automatically
+        info "Re-running installer to check for updates..."
+        curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+    else
         curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
         success "zoxide installed"
-    else
-        info "zoxide already installed"
     fi
 }
 
@@ -352,11 +385,12 @@ install_zoxide() {
 install_oh_my_posh() {
     step "Installing oh-my-posh"
 
-    if ! command_exists oh-my-posh; then
+    if command_exists oh-my-posh; then
+        info "oh-my-posh already installed, checking for updates..."
+        oh-my-posh upgrade 2>/dev/null || info "oh-my-posh is up to date"
+    else
         curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
         success "oh-my-posh installed"
-    else
-        info "oh-my-posh already installed"
     fi
 }
 
@@ -367,15 +401,20 @@ install_oh_my_posh() {
 install_sesh() {
     step "Installing sesh"
 
-    if ! command_exists sesh; then
-        info "Installing sesh via cargo..."
-        if ! command_exists cargo; then
-            install_rust_tools
-        fi
-        go install github.com/joshmedeski/sesh/v2@latest
-        success "sesh installed"
+    if ! command_exists go; then
+        warning "Go not installed, installing Go first..."
+        install_golang
+    fi
+
+    if command_exists sesh; then
+        CURRENT_SESH=$(sesh --version 2>/dev/null | grep -oP 'v\K[0-9.]+' || echo "unknown")
+        info "sesh already installed: v$CURRENT_SESH"
+        info "Updating to latest version..."
+        go install github.com/joshmedeski/sesh@latest 2>/dev/null && success "sesh updated" || info "sesh is up to date"
     else
-        info "sesh already installed"
+        info "Installing sesh via go install..."
+        go install github.com/joshmedeski/sesh@latest
+        success "sesh installed"
     fi
 }
 
@@ -386,13 +425,25 @@ install_sesh() {
 install_nvm() {
     step "Installing NVM"
 
-    if [ ! -d "$HOME/.nvm" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+    if [ -d "$HOME/.nvm" ]; then
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+        if command -v nvm &> /dev/null; then
+            CURRENT_NVM=$(nvm --version 2>/dev/null || echo "unknown")
+            info "NVM already installed: v$CURRENT_NVM"
+            info "To update NVM, run: (cd \$NVM_DIR && git pull)"
+        else
+            info "NVM directory exists but nvm command not available"
+        fi
+    else
+        # Get latest NVM version
+        LATEST_NVM=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "0.39.7")
+        info "Installing NVM v$LATEST_NVM..."
+        curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/v${LATEST_NVM}/install.sh" | bash
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         success "NVM installed"
-    else
-        info "NVM already installed"
     fi
 }
 
@@ -403,17 +454,35 @@ install_nvm() {
 install_golang() {
     step "Installing Golang"
 
-    if command_exists go; then
-        info "Golang already installed: $(go version)"
-        return
-    fi
-
-    # Get latest Go version
-    GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | head -n1)
+    # Get latest Go version (try multiple methods)
+    GO_VERSION=$(curl -s https://go.dev/VERSION?m=text 2>/dev/null | head -n1)
 
     if [ -z "$GO_VERSION" ]; then
-        warning "Could not fetch latest Go version, using go1.21.5"
-        GO_VERSION="go1.21.5"
+        # Try alternative method
+        GO_VERSION=$(curl -sL https://golang.org/VERSION?m=text 2>/dev/null | head -n1)
+    fi
+
+    if [ -z "$GO_VERSION" ]; then
+        # Try getting from GitHub API
+        GO_VERSION=$(curl -s https://api.github.com/repos/golang/go/tags 2>/dev/null | grep -m1 '"name":' | grep -oP 'go[0-9.]+' | head -1)
+    fi
+
+    if [ -z "$GO_VERSION" ]; then
+        error "Could not fetch Go version from any source"
+        warning "Skipping Golang installation. Please install manually from https://go.dev/dl/"
+        return 1
+    fi
+
+    info "Latest Go version: $GO_VERSION"
+
+    if command_exists go; then
+        CURRENT_VERSION=$(go version | awk '{print $3}')
+        if [ "$CURRENT_VERSION" = "$GO_VERSION" ]; then
+            info "Golang already at latest version: $CURRENT_VERSION"
+            return
+        else
+            info "Upgrading Golang from $CURRENT_VERSION to $GO_VERSION"
+        fi
     fi
 
     info "Installing $GO_VERSION..."
@@ -428,10 +497,18 @@ install_golang() {
     esac
 
     # Download and install
-    wget -q --show-progress "https://go.dev/dl/${GO_VERSION}.linux-${ARCH}.tar.gz" -O /tmp/go.tar.gz
-    sudo rm -rf /usr/local/go
-    sudo tar -C /usr/local -xzf /tmp/go.tar.gz
-    rm /tmp/go.tar.gz
+    DOWNLOAD_URL="https://go.dev/dl/${GO_VERSION}.linux-${ARCH}.tar.gz"
+    info "Downloading from: $DOWNLOAD_URL"
+
+    if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/go.tar.gz; then
+        sudo rm -rf /usr/local/go
+        sudo tar -C /usr/local -xzf /tmp/go.tar.gz
+        rm /tmp/go.tar.gz
+    else
+        error "Failed to download Go from $DOWNLOAD_URL"
+        warning "Please check if the version exists at https://go.dev/dl/"
+        return 1
+    fi
 
     # Add to PATH in bashrc if not already there
     if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
@@ -535,16 +612,23 @@ install_nerd_fonts() {
     FONT_DIR="$HOME/.local/share/fonts"
     FONT_NAME="FiraCode"
 
+    # Get latest version
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "3.1.1")
+
     if fc-list | grep -qi "FiraCode.*Nerd"; then
         info "FiraCode Nerd Font already installed"
+        # Note: Font version checking is complex, skipping version check for now
         return
     fi
 
     mkdir -p "$FONT_DIR"
-    cd "$FONT_DIR"
 
-    info "Downloading FiraCode Nerd Font..."
-    if wget -q --show-progress https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/FiraCode.zip -O FiraCode.zip 2>/dev/null; then
+    # Save current directory
+    PREV_DIR=$(pwd)
+    cd "$FONT_DIR" || { warning "Failed to access font directory"; return 1; }
+
+    info "Downloading FiraCode Nerd Font v${LATEST_VERSION}..."
+    if wget -q --show-progress "https://github.com/ryanoasis/nerd-fonts/releases/download/v${LATEST_VERSION}/FiraCode.zip" -O FiraCode.zip 2>/dev/null; then
         if [ -f FiraCode.zip ]; then
             unzip -o FiraCode.zip -d "$FONT_NAME" 2>&1 | grep -v "Archive:" || true
             rm -f FiraCode.zip
@@ -556,12 +640,17 @@ install_nerd_fonts() {
             info "Configure your terminal to use 'FiraCode Nerd Font'"
         else
             warning "FiraCode Nerd Font download incomplete, skipping..."
+            cd "$PREV_DIR" || cd "$HOME"
             return 0
         fi
     else
         warning "Failed to download FiraCode Nerd Font, skipping..."
+        cd "$PREV_DIR" || cd "$HOME"
         return 0
     fi
+
+    # Return to previous directory
+    cd "$PREV_DIR" || cd "$HOME"
 }
 
 # =============================================================================
@@ -1003,6 +1092,27 @@ install_rust_utilities() {
 build_neovim_from_source() {
     step "Building Neovim from source"
 
+    # Check if nvim is already installed and up-to-date
+    if command_exists nvim; then
+        CURRENT_COMMIT=$(nvim --version | head -1 | grep -oP 'NVIM v[0-9.]+-dev-\K[0-9]+' || echo "")
+
+        # Fetch latest stable commit without cloning
+        LATEST_COMMIT=$(git ls-remote https://github.com/neovim/neovim refs/heads/stable | cut -f1 | cut -c1-7)
+
+        if [ -n "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
+            info "Current Neovim commit: $CURRENT_COMMIT, Latest stable: $LATEST_COMMIT"
+            # For stable releases, just check if nvim exists with recent version
+            CURRENT_VERSION=$(nvim --version | head -1 | grep -oP 'NVIM v\K[0-9.]+' || echo "0.0.0")
+            info "Neovim already installed: v$CURRENT_VERSION"
+
+            read -p "Rebuild Neovim from latest stable? (y/N): " rebuild
+            if [[ ! "$rebuild" =~ ^[Yy]$ ]]; then
+                info "Skipping Neovim build"
+                return
+            fi
+        fi
+    fi
+
     # Install build dependencies
     info "Installing Neovim build dependencies..."
 
@@ -1084,7 +1194,7 @@ build_neovim_from_source() {
     git checkout stable
 
     info "Building Neovim (this will take several minutes)..."
-    make CMAKE_BUILD_TYPE=RelWithDebInfo 
+    make CMAKE_BUILD_TYPE=RelWithDebInfo
     cd build && cpack -G DEB && sudo dpkg -i nvim-linux-x86_64.deb
 
     # Cleanup
@@ -1119,38 +1229,10 @@ setup_astronvim() {
         esac
     fi
 
-    # Node.js for LSP servers
-    if ! command_exists node; then
-        info "Installing Node.js via NVM for LSP servers..."
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm install --lts
-        nvm use --lts
-    fi
 
-    # Language servers and tools
-    info "Installing language servers..."
-    npm install -g \
-        bash-language-server \
-        typescript-language-server \
-        vscode-langservers-extracted \
-        yaml-language-server \
-        dockerfile-language-server-nodejs \
-        pyright \
-        @tailwindcss/language-server \
-        graphql-language-service-cli 2>/dev/null || true
-
-    # Python language servers
-    python3 -m pip install --user \
-        python-lsp-server \
-        pyls-flake8 \
-        pylsp-mypy \
-        python-lsp-black 2>/dev/null || true
-
-    # Rust analyzer (if Rust installed)
-    if command_exists rustup; then
-        rustup component add rust-analyzer
-    fi
+    info "Backing up the nvim config"
+    # Ensure we're in a safe directory
+    cd "$HOME" || cd /tmp
 
     # Backup existing nvim config
     if [ -d ~/.config/nvim ]; then
@@ -1253,17 +1335,30 @@ install_kubernetes_tools() {
     step "Installing Kubernetes tools (kubectl, helm, minikube, kind)"
 
     # Install kubectl
-    if ! command_exists kubectl; then
-        info "Installing kubectl..."
-        KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt 2>/dev/null || echo "")
+    KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt 2>/dev/null || echo "")
 
-        if [ -z "$KUBECTL_VERSION" ]; then
-            warning "Could not fetch kubectl version, skipping..."
+    if [ -z "$KUBECTL_VERSION" ]; then
+        warning "Could not fetch kubectl version, skipping..."
+    else
+        if command_exists kubectl; then
+            CURRENT_VERSION="v$(kubectl version --client -o json 2>/dev/null | grep -oP '"gitVersion":\s*"\K[^"]+' || echo "unknown")"
+            if [ "$CURRENT_VERSION" = "$KUBECTL_VERSION" ]; then
+                info "kubectl already at latest version: $CURRENT_VERSION"
+            else
+                info "Updating kubectl from $CURRENT_VERSION to $KUBECTL_VERSION..."
+                if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
+                    chmod +x kubectl 2>/dev/null || true
+                    mv kubectl ~/.local/bin/ 2>/dev/null || { warning "Failed to update kubectl"; rm -f kubectl; }
+                    success "kubectl updated to $KUBECTL_VERSION"
+                else
+                    warning "Failed to download kubectl, skipping..."
+                fi
+            fi
         else
+            info "Installing kubectl..."
             if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
                 chmod +x kubectl 2>/dev/null || true
                 mv kubectl ~/.local/bin/ 2>/dev/null || { warning "Failed to install kubectl"; rm -f kubectl; }
-
                 if command_exists kubectl; then
                     success "kubectl installed"
                 else
@@ -1273,24 +1368,28 @@ install_kubernetes_tools() {
                 warning "Failed to download kubectl, skipping..."
             fi
         fi
-    else
-        info "kubectl already installed"
     fi
 
     # Install helm
-    if ! command_exists helm; then
+    if command_exists helm; then
+        CURRENT_HELM=$(helm version --template='{{.Version}}' 2>/dev/null | sed 's/v//' || echo "unknown")
+        info "helm already installed: v$CURRENT_HELM"
+        info "Use 'helm repo update' to update repositories"
+    else
         info "Installing helm..."
         if curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 2>/dev/null | bash 2>/dev/null; then
             success "helm installed"
         else
             warning "Failed to install helm, skipping..."
         fi
-    else
-        info "helm already installed"
     fi
 
     # Install minikube
-    if ! command_exists minikube; then
+    if command_exists minikube; then
+        CURRENT_MINIKUBE=$(minikube version --short 2>/dev/null | sed 's/v//' || echo "unknown")
+        info "minikube already installed: v$CURRENT_MINIKUBE"
+        info "Use 'minikube update-check' to check for updates"
+    else
         info "Installing minikube..."
         if curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 2>/dev/null; then
             chmod +x minikube-linux-amd64 2>/dev/null || true
@@ -1304,26 +1403,38 @@ install_kubernetes_tools() {
         else
             warning "Failed to download minikube, skipping..."
         fi
-    else
-        info "minikube already installed"
     fi
 
     # Install kind (Kubernetes in Docker)
-    if ! command_exists kind; then
-        info "Installing kind..."
-        # Detect architecture
-        ARCH=$(uname -m)
-        case $ARCH in
-            x86_64)  ARCH="amd64" ;;
-            aarch64) ARCH="arm64" ;;
-            *)       warning "Skipping kind - unsupported architecture: $ARCH"; return 0 ;;
-        esac
+    # Detect architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)  ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+        *)       warning "Skipping kind - unsupported architecture: $ARCH"; return 0 ;;
+    esac
 
-        KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' 2>/dev/null || echo "")
+    KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' 2>/dev/null || echo "")
 
-        if [ -z "$KIND_VERSION" ]; then
-            warning "Could not fetch kind version, skipping..."
+    if [ -z "$KIND_VERSION" ]; then
+        warning "Could not fetch kind version, skipping..."
+    else
+        if command_exists kind; then
+            CURRENT_KIND=$(kind version 2>/dev/null | grep -oP 'kind v\K[0-9.]+' || echo "unknown")
+            if [ "$CURRENT_KIND" = "$KIND_VERSION" ]; then
+                info "kind already at latest version: $CURRENT_KIND"
+            else
+                info "Updating kind from $CURRENT_KIND to $KIND_VERSION..."
+                if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
+                    chmod +x ./kind 2>/dev/null || true
+                    mv ./kind ~/.local/bin/kind 2>/dev/null || { warning "Failed to update kind"; rm -f kind; }
+                    success "kind updated to $KIND_VERSION"
+                else
+                    warning "Failed to download kind, skipping..."
+                fi
+            fi
         else
+            info "Installing kind..."
             if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
                 chmod +x ./kind 2>/dev/null || true
                 mv ./kind ~/.local/bin/kind 2>/dev/null || { warning "Failed to install kind"; rm -f kind; }
@@ -1337,22 +1448,23 @@ install_kubernetes_tools() {
                 warning "Failed to download kind, skipping..."
             fi
         fi
-    else
-        info "kind already installed"
     fi
 
     # Install kubectx and kubens
-    if ! command_exists kubectx; then
+    if [ -d /opt/kubectx ]; then
+        info "kubectx already installed, updating..."
+        (cd /opt/kubectx && sudo git pull 2>/dev/null) && success "kubectx/kubens updated" || info "kubectx/kubens already up to date"
+        sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx 2>/dev/null || true
+        sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens 2>/dev/null || true
+    else
         info "Installing kubectx and kubens..."
-        if sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx 2>/dev/null || (cd /opt/kubectx && sudo git pull 2>/dev/null); then
+        if sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx 2>/dev/null; then
             sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx 2>/dev/null || true
             sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens 2>/dev/null || true
             success "kubectx and kubens installed"
         else
             warning "Failed to install kubectx/kubens, skipping..."
         fi
-    else
-        info "kubectx already installed"
     fi
 }
 
@@ -1417,11 +1529,6 @@ install_blesh() {
 install_lazydocker() {
     step "Installing lazydocker"
 
-    if command_exists lazydocker; then
-        info "lazydocker already installed"
-        return
-    fi
-
     ARCH=$(uname -m)
     case $ARCH in
         x86_64)  ARCH="x86_64" ;;
@@ -1436,6 +1543,16 @@ install_lazydocker() {
         return 0
     fi
 
+    if command_exists lazydocker; then
+        CURRENT_VERSION=$(lazydocker --version 2>/dev/null | grep -oP 'Version: \K[0-9.]+' || echo "unknown")
+        if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+            info "lazydocker already at latest version: $CURRENT_VERSION"
+            return
+        else
+            info "Updating lazydocker from $CURRENT_VERSION to $LATEST_VERSION"
+        fi
+    fi
+
     DOWNLOAD_URL="https://github.com/jesseduffield/lazydocker/releases/download/v${LATEST_VERSION}/lazydocker_${LATEST_VERSION}_Linux_${ARCH}.tar.gz"
 
     info "Downloading lazydocker v${LATEST_VERSION}..."
@@ -1448,7 +1565,7 @@ install_lazydocker() {
         rm -f /tmp/lazydocker.tar.gz
 
         if command_exists lazydocker; then
-            success "lazydocker installed"
+            success "lazydocker installed/updated to v${LATEST_VERSION}"
         else
             warning "lazydocker installation failed"
         fi
@@ -1464,11 +1581,6 @@ install_lazydocker() {
 install_k9s() {
     step "Installing k9s"
 
-    if command_exists k9s; then
-        info "k9s already installed"
-        return
-    fi
-
     ARCH=$(uname -m)
     case $ARCH in
         x86_64)  ARCH="amd64" ;;
@@ -1483,6 +1595,16 @@ install_k9s() {
         return 0
     fi
 
+    if command_exists k9s; then
+        CURRENT_VERSION=$(k9s version -s 2>/dev/null | grep -oP 'Version\s+\K[0-9.]+' | head -1 || echo "unknown")
+        if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+            info "k9s already at latest version: $CURRENT_VERSION"
+            return
+        else
+            info "Updating k9s from $CURRENT_VERSION to $LATEST_VERSION"
+        fi
+    fi
+
     DOWNLOAD_URL="https://github.com/derailed/k9s/releases/download/v${LATEST_VERSION}/k9s_Linux_${ARCH}.tar.gz"
 
     info "Downloading k9s v${LATEST_VERSION}..."
@@ -1495,7 +1617,7 @@ install_k9s() {
         rm -f /tmp/k9s.tar.gz
 
         if command_exists k9s; then
-            success "k9s installed"
+            success "k9s installed/updated to v${LATEST_VERSION}"
         else
             warning "k9s installation failed"
         fi
