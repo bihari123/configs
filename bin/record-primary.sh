@@ -17,7 +17,12 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             echo "Usage: $0 [-w|--webcam] [--webcam-device DEVICE]"
             echo ""
-            echo "Record your screen or a specific window with optional webcam overlay."
+            echo "Record your screen(s) or a specific window with optional webcam overlay."
+            echo ""
+            echo "Recording modes:"
+            echo "  1. Single monitor - Record one display"
+            echo "  2. All monitors   - Record all connected displays simultaneously"
+            echo "  3. Window         - Record a specific window"
             echo ""
             echo "Options:"
             echo "  -w, --webcam          Enable webcam overlay in bottom right"
@@ -35,20 +40,24 @@ done
 
 # Ask user for recording mode
 echo "Recording mode:"
-echo "  1. Whole screen"
-echo "  2. Window"
+echo "  1. Single monitor"
+echo "  2. All monitors"
+echo "  3. Window"
 echo ""
 
 while true; do
-    read -p "Choose recording mode (1-2): " MODE_CHOICE
+    read -p "Choose recording mode (1-3): " MODE_CHOICE
     if [[ "$MODE_CHOICE" == "1" ]]; then
         RECORDING_MODE="screen"
         break
     elif [[ "$MODE_CHOICE" == "2" ]]; then
+        RECORDING_MODE="all_monitors"
+        break
+    elif [[ "$MODE_CHOICE" == "3" ]]; then
         RECORDING_MODE="window"
         break
     else
-        echo "Invalid choice. Please enter 1 or 2"
+        echo "Invalid choice. Please enter 1, 2, or 3"
     fi
 done
 
@@ -145,7 +154,7 @@ if [ "$RECORDING_MODE" = "window" ]; then
     done
 
     echo "Selected window: $SELECTED_WINDOW_NAME ($SELECTED_WINDOW_ID)"
-else
+elif [ "$RECORDING_MODE" = "screen" ] || [ "$RECORDING_MODE" = "all_monitors" ]; then
     # Get all connected displays with full info
     mapfile -t DISPLAY_LINES < <(xrandr --query | grep " connected")
 
@@ -188,13 +197,72 @@ for line in "${DISPLAY_LINES[@]}"; do
     SIZES+=("$SIZE_DISPLAY")
 done
 
-# If only one display, use it automatically
-if [ ${#DISPLAYS[@]} -eq 1 ]; then
+# Handle display selection based on mode
+if [ "$RECORDING_MODE" = "all_monitors" ]; then
+    # Calculate bounding box for all monitors
+    echo "Calculating combined display area for ${#DISPLAYS[@]} monitor(s)..."
+
+    MIN_X=999999
+    MIN_Y=999999
+    MAX_X=0
+    MAX_Y=0
+
+    for i in "${!DISPLAYS[@]}"; do
+        DISPLAY_NAME="${DISPLAYS[$i]}"
+        RESOLUTION="${RESOLUTIONS[$i]}"
+
+        # Extract width, height, and offsets
+        DISPLAY_GEOM=$(echo "$RESOLUTION" | cut -d'+' -f1)
+        DISPLAY_WIDTH=$(echo "$DISPLAY_GEOM" | cut -d'x' -f1)
+        DISPLAY_HEIGHT=$(echo "$DISPLAY_GEOM" | cut -d'x' -f2)
+        DISPLAY_X=$(echo "$RESOLUTION" | cut -d'+' -f2)
+        DISPLAY_Y=$(echo "$RESOLUTION" | cut -d'+' -f3)
+
+        # Update bounding box
+        [ "$DISPLAY_X" -lt "$MIN_X" ] && MIN_X=$DISPLAY_X
+        [ "$DISPLAY_Y" -lt "$MIN_Y" ] && MIN_Y=$DISPLAY_Y
+
+        DISPLAY_MAX_X=$((DISPLAY_X + DISPLAY_WIDTH))
+        DISPLAY_MAX_Y=$((DISPLAY_Y + DISPLAY_HEIGHT))
+        [ "$DISPLAY_MAX_X" -gt "$MAX_X" ] && MAX_X=$DISPLAY_MAX_X
+        [ "$DISPLAY_MAX_Y" -gt "$MAX_Y" ] && MAX_Y=$DISPLAY_MAX_Y
+
+        echo "  Display $((i+1)): ${DISPLAY_NAME} - ${DISPLAY_GEOM} at +${DISPLAY_X}+${DISPLAY_Y}"
+    done
+
+    # Calculate combined geometry
+    COMBINED_WIDTH=$((MAX_X - MIN_X))
+    COMBINED_HEIGHT=$((MAX_Y - MIN_Y))
+
+    # Ensure dimensions are divisible by 2 (required for H.264 encoding)
+    COMBINED_WIDTH=$((COMBINED_WIDTH - (COMBINED_WIDTH % 2)))
+    COMBINED_HEIGHT=$((COMBINED_HEIGHT - (COMBINED_HEIGHT % 2)))
+
+    GEOMETRY="${COMBINED_WIDTH}x${COMBINED_HEIGHT}"
+    OFFSET="${MIN_X},${MIN_Y}"
+
+    echo "Combined area: ${GEOMETRY} at offset ${OFFSET}"
+    PRIMARY_DISPLAY="all_monitors"
+elif [ ${#DISPLAYS[@]} -eq 1 ]; then
+    # If only one display, use it automatically
     SELECTED_INDEX=0
     echo "Only one display found: ${DISPLAYS[0]}"
     echo "  Resolution: ${RESOLUTIONS[0]}"
     echo "  Rotation: ${ROTATIONS[0]}"
     echo "  Physical size: ${SIZES[0]}"
+
+    # Get selected display info
+    PRIMARY_DISPLAY="${DISPLAYS[$SELECTED_INDEX]}"
+    RESOLUTION="${RESOLUTIONS[$SELECTED_INDEX]}"
+
+    if [ -z "$RESOLUTION" ]; then
+        echo "Error: Could not get resolution for $PRIMARY_DISPLAY"
+        exit 1
+    fi
+
+    # Extract geometry
+    GEOMETRY=$(echo $RESOLUTION | cut -d'+' -f1)
+    OFFSET=$(echo $RESOLUTION | cut -d'+' -f2-3 | tr '+' ',')
 else
     # Show menu of available displays
     echo "Available displays:"
@@ -217,7 +285,6 @@ else
             echo "Invalid choice. Please enter a number between 1 and ${#DISPLAYS[@]}"
         fi
     done
-    fi
 
     # Get selected display info
     PRIMARY_DISPLAY="${DISPLAYS[$SELECTED_INDEX]}"
@@ -231,6 +298,7 @@ else
     # Extract geometry
     GEOMETRY=$(echo $RESOLUTION | cut -d'+' -f1)
     OFFSET=$(echo $RESOLUTION | cut -d'+' -f2-3 | tr '+' ',')
+fi
 fi
 
 # Get geometry based on recording mode
@@ -267,6 +335,11 @@ echo "Detecting display capabilities..."
 if [ "$RECORDING_MODE" = "screen" ]; then
     DISPLAY_INFO=$(xrandr --query | grep "^${PRIMARY_DISPLAY} connected")
     CURRENT_MODE=$(xrandr --query | grep "^${PRIMARY_DISPLAY}" -A 20 | grep '\*' | head -1)
+elif [ "$RECORDING_MODE" = "all_monitors" ]; then
+    # For all monitors mode, get info from the first connected display
+    DISPLAY_INFO=$(xrandr --query | grep " connected" | head -1)
+    DISPLAY_NAME=$(echo "$DISPLAY_INFO" | cut -d" " -f1)
+    CURRENT_MODE=$(xrandr --query | grep "^${DISPLAY_NAME}" -A 20 | grep '\*' | head -1)
 else
     # For window mode, get info from the primary/first connected display
     DISPLAY_INFO=$(xrandr --query | grep " connected" | head -1)
@@ -469,6 +542,8 @@ done
 
 if [ "$RECORDING_MODE" = "screen" ]; then
     echo "Recording primary display: $PRIMARY_DISPLAY"
+elif [ "$RECORDING_MODE" = "all_monitors" ]; then
+    echo "Recording all monitors (${#DISPLAYS[@]} displays)"
 else
     echo "Recording window: $SELECTED_WINDOW_NAME"
 fi
