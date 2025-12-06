@@ -123,11 +123,28 @@ install_to_system() {
     fi
 }
 
-# Check dependencies before proceeding
-check_dependencies
-
-# Install to system if not already installed
-install_to_system
+# Quick switch mode (for command line arguments) - check early to skip interactive setup
+if [ "$1" = "dark" ] || [ "$1" = "lit" ] || [ "$1" = "light" ] || [ "$1" = "status" ]; then
+    # For quick commands, just check dependencies silently
+    if ! command -v ddcutil &> /dev/null; then
+        echo -e "${RED}Error: ddcutil not installed. Please run 'mo' without arguments to install dependencies.${NC}"
+        exit 1
+    fi
+elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Monitor Optimizer - Adjust monitor settings for different environments"
+    echo
+    echo "Usage:"
+    echo "  $0          - Interactive mode"
+    echo "  $0 dark     - Quick switch to dark room settings"
+    echo "  $0 lit      - Quick switch to lit room settings"
+    echo "  $0 status   - Show current settings"
+    echo "  $0 --help   - Show this help"
+    exit 0
+else
+    # Only run full setup in interactive mode
+    check_dependencies
+    install_to_system
+fi
 
 # Function to detect displays
 detect_displays() {
@@ -147,22 +164,24 @@ detect_displays() {
 # Function to apply dark room settings
 apply_dark_room() {
     echo -e "\n${YELLOW}Applying dark room settings...${NC}"
-    echo "  Brightness: 12%"
+    echo "  Brightness: 15%"
     echo "  Contrast: 60%"
-    
+
     for display in $DISPLAYS; do
         echo -e "  ${BLUE}Configuring Display $display...${NC}"
-        ddcutil setvcp 10 12 --display $display 2>/dev/null
-        ddcutil setvcp 12 60 --display $display 2>/dev/null
+        ddcutil setvcp 10 15 --display $display 2>/dev/null || true
+        ddcutil setvcp 12 60 --display $display 2>/dev/null || true
+        # Saturation is not supported on all monitors
+        ddcutil setvcp 8A 40 --display $display 2>/dev/null || true
     done
-    
+
     # Apply redshift if available
     if command -v redshift &> /dev/null; then
-        echo -e "  ${BLUE}Applying blue light filter (3400K)...${NC}"
+        echo -e "  ${BLUE}Applying blue light filter (4000K)...${NC}"
         killall redshift 2>/dev/null || true
-        redshift -P -O 3400 -b 0.85 -m randr &>/dev/null
+        redshift -P -O 4000 -b 0.8 -m randr &>/dev/null
     fi
-    
+
     echo -e "${GREEN}Dark room settings applied!${NC}"
 }
 
@@ -171,11 +190,11 @@ apply_lit_room() {
     echo -e "\n${YELLOW}Applying well-lit room settings...${NC}"
     echo "  Brightness: 70%"
     echo "  Contrast: 75%"
-    
+
     for display in $DISPLAYS; do
         echo -e "  ${BLUE}Configuring Display $display...${NC}"
-        ddcutil setvcp 10 70 --display $display 2>/dev/null
-        ddcutil setvcp 12 75 --display $display 2>/dev/null
+        ddcutil setvcp 10 70 --display $display 2>/dev/null || true
+        ddcutil setvcp 12 75 --display $display 2>/dev/null || true
     done
     
     # Reset redshift if available
@@ -277,32 +296,27 @@ main_menu() {
     esac
 }
 
-# Quick switch mode (for command line arguments)
-if [ "$1" = "dark" ]; then
-    detect_displays > /dev/null 2>&1
-    apply_dark_room
-    save_profile "dark"
-    exit 0
-elif [ "$1" = "lit" ] || [ "$1" = "light" ]; then
-    detect_displays > /dev/null 2>&1
-    apply_lit_room
-    save_profile "lit"
-    exit 0
-elif [ "$1" = "status" ]; then
-    detect_displays > /dev/null 2>&1
-    show_current
-    exit 0
-elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Monitor Optimizer - Adjust monitor settings for different environments"
-    echo
-    echo "Usage:"
-    echo "  $0          - Interactive mode"
-    echo "  $0 dark     - Quick switch to dark room settings"
-    echo "  $0 lit      - Quick switch to lit room settings"
-    echo "  $0 status   - Show current settings"
-    echo "  $0 --help   - Show this help"
-    exit 0
-fi
-
-# Run main menu
-main_menu
+# Execute based on command line argument
+case "$1" in
+    dark)
+        detect_displays > /dev/null 2>&1
+        apply_dark_room
+        save_profile "dark"
+        exit 0
+        ;;
+    lit|light)
+        detect_displays > /dev/null 2>&1
+        apply_lit_room
+        save_profile "lit"
+        exit 0
+        ;;
+    status)
+        detect_displays > /dev/null 2>&1
+        show_current
+        exit 0
+        ;;
+    *)
+        # Run interactive main menu
+        main_menu
+        ;;
+esac
