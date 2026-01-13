@@ -1,0 +1,336 @@
+{
+    "vim.leader": "<space>",
+    "vim.hlsearch": true,
+    "vim.incsearch": true,
+    "vim.useSystemClipboard": true,
+    "vim.ignorecase": true,
+    "vim.smartcase": true,
+    "vim.easymotion": true,
+    "vim.sneak": true,
+    "vim.surround": true,
+    "vim.timeout": 1000,
+
+    "vim.normalModeKeyBindings": [
+        // === FILE NAVIGATION ===
+        {
+            "before": ["<leader>", "e"],
+            "commands": ["workbench.view.explorer"]
+        },
+        {
+            "before": ["<leader>", "o"],
+            "commands": ["workbench.action.toggleSidebarVisibility"]
+        },
+        {
+            "before": ["<leader>", "p"],
+            "commands": ["workbench.action.quickOpen"]
+        },
+        {
+            "before": ["<leader>", "w"],
+            "commands": ["workbench.action.files.save"]
+        },
+        {
+            "before": ["<leader>", "q"],
+            "commands": ["workbench.action.closeActiveEditor"]
+        },
+        {
+            "before": ["<leader>", "W"],
+            "commands": ["workbench.action.files.saveAll"]
+        },
+        {
+            "before": ["<leader>", "Q"],
+            "commands": ["workbench.action.closeAllEditors"]
+        },
+        {
+            "before": ["<leader>", "n"],
+            "commands": ["explorer.newFile"]
+        },
+        {
+            "before": ["<leader>", "N"],
+            "commands": ["explorer.newFolder"]
+        },
+        {
+            "before": ["<leader>", "d"],
+            "commands": ["deleteFile"]
+        },
+        {
+            "before": ["<leader>", "r"],
+            "commands": ["renameFile"]
+        },
+        {
+            "before": ["<leader>", "x"],
+            "commands": ["filesExplorer.cut"]
+        },
+        {
+            "before": ["<leader>", "c"],
+            "commands": ["filesExplorer.copy"]
+        },
+        {
+            "before": ["<leader>", "v"],
+            "commands": ["filesExplorer.paste"]
+        },
+
+        // === SEARCH & RIPGREP ===
+        {
+            "before": ["<leader>", "f", "f"],
+            "commands": ["workbench.action.findInFiles"]
+        },
+        {
+            "before": ["<leader>", "f", "w"],
+            "commands": ["workbench.action.findInFiles"],
+            "args": {
+                "query": "<cword>"
+            }
+        },
+        {
+            "before": ["<leader>", "f", "g"],
+            "commands": ["workbench.view.search"]
+        },
+        {
+            "before": ["<leader>", "f", "s"],
+            "commands": ["workbench.action.quickTextSearch"]
+        },
+
+        // === BUFFER/TAB MANAGEMENT ===
+        {
+            "before": ["<leader>", "b"],
+            "commands": ["workbench.action.showAllEditors"]
+        },
+        {
+            "before": ["<leader>", "b", "b"],
+            "commands": ["workbench.action.showAllEditors"]
+        },
+        {
+            "before": ["<leader>", "b", "d"],
+            "commands": ["workbench.action.closeActiveEditor"]
+        },
+        {
+            "before": ["<leader>", "b", "n"],
+            "commands": ["workbench.action.newEditor"]
+        },
+        {
+            "before": ["H"],
+            "commands": ["workbench.action.previousEditor"]
+        },
+        {
+            "before": ["L"],
+            "commands": ["workbench.action.nextEditor"]
+        },
+        {
+            "before": ["<C-h>"],
+            "commands": ["workbench.action.focusPreviousGroup"]
+        },
+        {
+            "before": ["<C-l>"],
+            "commands": ["workbench.action.focusNextGroup"]
+        },
+        {
+            "before": ["<C-w>", "h"],
+            "commands": ["workbench.action.focusPreviousGroup"]
+        },
+        {
+            "before": ["<C-w>", "l"],
+            "commands": ["workbench.action.focusNextGroup"]
+        },
+        {
+            "before": ["<C-w>", "j"],
+            "commands": ["workbench.action.focusBelowGroup"]
+        },
+        {
+            "before": ["<C-w>", "k"],
+            "commands": ["workbench.action.focusAboveGroup"]
+        },
+        {
+            "before": ["<C-w>", "s"],
+            "commands": ["workbench.action.splitEditor"]
+        },
+        {
+            "before": ["<C-w>", "v"],
+            "commands": ["workbench.action.splitEditorRight"]
+        },
+        {
+            "before": ["<C-w>", "q"],
+            "commands": ["workbench.action.closeEditorsInGroup"]
+        },
+
+        // === TERMINAL ===
+        {
+            "before": ["<leader>", "t"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        },
+        {
+            "before": ["<leader>", "t", "t"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        },
+        {
+            "before": ["<leader>", "t", "n"],
+            "commands": ["workbench.action.terminal.new"]
+        },
+        {
+            "before": ["<C-\\>"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        },
+
+        // === GIT ===
+        {
+            "before": ["<leader>", "g", "g"],
+            "commands": ["workbench.view.scm"]
+        },
+        {
+            "before": ["<leader>", "g", "s"],
+            "commands": ["workbench.view.scm"]
+        },
+        {
+            "before": ["<leader>", "g", "c"],
+            "commands": ["git.commit"]
+        },
+        {
+            "before": ["<leader>", "g", "p"],
+            "commands": ["git.push"]
+        },
+        {
+            "before": ["<leader>", "g", "l"],
+            "commands": ["git.log"]
+        },
+
+        // === CODE NAVIGATION ===
+        {
+            "before": ["<leader>", "d", "d"],
+            "commands": ["editor.action.revealDefinition"]
+        },
+        {
+            "before": ["<leader>", "d", "r"],
+            "commands": ["editor.action.goToReferences"]
+        },
+        {
+            "before": ["<leader>", "d", "i"],
+            "commands": ["editor.action.goToImplementation"]
+        },
+        {
+            "before": ["g", "d"],
+            "commands": ["editor.action.revealDefinition"]
+        },
+        {
+            "before": ["g", "r"],
+            "commands": ["editor.action.goToReferences"]
+        },
+        {
+            "before": ["g", "i"],
+            "commands": ["editor.action.goToImplementation"]
+        },
+
+        // === SYMBOLS ===
+        {
+            "before": ["<leader>", "s", "s"],
+            "commands": ["workbench.action.showAllSymbols"]
+        },
+        {
+            "before": ["<leader>", "s", "o"],
+            "commands": ["workbench.action.gotoSymbol"]
+        },
+        {
+            "before": ["<leader>", "s", "w"],
+            "commands": ["workbench.action.showAllSymbols"]
+        },
+
+        // === DIAGNOSTICS ===
+        {
+            "before": ["<leader>", "x", "x"],
+            "commands": ["workbench.actions.view.problems"]
+        },
+        {
+            "before": ["<leader>", "x", "l"],
+            "commands": ["workbench.action.nextProblem"]
+        },
+        {
+            "before": ["<leader>", "x", "h"],
+            "commands": ["workbench.action.previousProblem"]
+        },
+        {
+            "before": ["["],
+            "commands": ["editor.action.marker.prev"]
+        },
+        {
+            "before": ["]"],
+            "commands": ["editor.action.marker.next"]
+        },
+
+        // === COMMAND PALETTE ===
+        {
+            "before": ["<leader>", " "],
+            "commands": ["workbench.action.showCommands"]
+        },
+
+        // === FORMATTING ===
+        {
+            "before": ["<leader>", "f", "m"],
+            "commands": ["editor.action.formatDocument"]
+        },
+        {
+            "before": ["<leader>", "f", "a"],
+            "commands": ["editor.action.formatDocument"]
+        }
+    ],
+
+    "vim.visualModeKeyBindings": [
+        // === VISUAL MODE SEARCH ===
+        {
+            "before": ["<leader>", "f", "f"],
+            "commands": ["workbench.action.findInFiles"],
+            "args": {
+                "query": "<selection>"
+            }
+        },
+        {
+            "before": ["*"],
+            "commands": ["editor.action.addSelectionToNextFindMatch"]
+        },
+        {
+            "before": ["#"],
+            "commands": ["editor.action.addSelectionToPreviousFindMatch"]
+        }
+    ],
+
+    "vim.insertModeKeyBindings": [
+        // === INSERT MODE ===
+        {
+            "before": ["<C-s>"],
+            "commands": ["workbench.action.files.save"],
+            "after": ["<Esc>"]
+        },
+        {
+            "before": ["<C-\\>"],
+            "commands": ["workbench.action.terminal.toggleTerminal"]
+        }
+    ],
+
+    "vim.normalModeKeyBindingsNonRecursive": [
+        // === NON-RECURSIVE BINDINGS ===
+        {
+            "before": ["j"],
+            "after": ["j", "g"]
+        },
+        {
+            "before": ["k"],
+            "after": ["k", "g"]
+        }
+    ],
+
+    "vim.handleKeys": {
+        "<C-a>": false,
+        "<C-f>": false,
+        "<C-b>": false,
+        "<C-n>": false,
+        "<C-p>": false
+    },
+    "editor.fontSize": 11,
+    "files.autoSave": "afterDelay",
+    "editor.fontFamily": "'FiraCode Nerd Font', 'monospace', monospace",
+    "editor.wordWrap": "on",
+    "editor.minimap.autohide": "mouseover",
+    "window.customTitleBarVisibility": "never",
+    "window.commandCenter": false,
+    "workbench.layoutControl.enabled": false,
+    "chat.commandCenter.enabled": false,
+    "window.menuBarVisibility": "compact",
+    "terminal.explorerKind": "external"
+}

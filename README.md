@@ -75,7 +75,6 @@ configs/
 ├── .bash_aliases                   # 60+ modern aliases & functions
 ├── .gitconfig                      # Git configuration
 ├── .inputrc                        # Readline configuration
-├── .ripgreprc                      # Ripgrep defaults
 │
 ├── alacritty/
 │   └── alacritty.toml             # Terminal emulator config

@@ -73,7 +73,6 @@ That's it! The interactive menu will guide you through the rest.
 - ✅ `.bash_aliases` - 60+ modern aliases & functions
 - ✅ `.gitconfig` - Git settings with delta integration
 - ✅ `.inputrc` - Better readline behavior
-- ✅ `.ripgreprc` - Ripgrep defaults
 - ✅ `tmux.conf` - Tmux with Zellij-style keybindings
 - ✅ `alacritty.toml` - Terminal emulator config
 - ✅ `nvim/` - Neovim configuration
@@ -352,7 +351,7 @@ The script is idempotent - it won't reinstall existing tools, just update config
 
 ### Remove Symlinks
 ```bash
-rm ~/.bashrc ~/.bash_aliases ~/.gitconfig ~/.inputrc ~/.ripgreprc
+rm ~/.bashrc ~/.bash_aliases ~/.gitconfig ~/.inputrc
 rm -rf ~/.config/tmux ~/.config/alacritty ~/.config/nvim
 rm -rf ~/.config/k9s ~/.config/lazydocker
 ```

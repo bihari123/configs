@@ -223,7 +223,6 @@ pkgconfig
 - **Arch:** Package: `ripgrep`
 - **What:** Ultra-fast grep alternative
 - **Replaces:** `grep`
-- **Config:** `~/.ripgreprc`
 
 ### 4. fd
 - **Version:** Latest
@@ -385,7 +384,6 @@ pkgconfig
 
 ### Git Configuration (2 files)
 1. `~/.gitconfig` ← `~/configs/.gitconfig`
-2. `~/.ripgreprc` ← `~/configs/.ripgreprc`
 
 ### Terminal Configuration (2 directories)
 1. `~/.config/tmux/tmux.conf` ← `~/configs/tmux/tmux.conf`

@@ -23,6 +23,7 @@ show_help() {
     echo "Hotkeys when running:"
     echo "  Ctrl+Alt+R   Start recording"
     echo "  Ctrl+Alt+S   Stop and transcribe"
+    echo "  Ctrl+Alt+L   Toggle LLM restructuring"
     echo "  Ctrl+C       Exit service"
     echo ""
 }
@@ -158,7 +159,7 @@ case "$1" in
         echo "Starting Whisper Voice-to-Text Service..."
         echo "Press Ctrl+C to stop"
         echo ""
-        python3 "$SCRIPT"
+        python3 -u "$SCRIPT"
         ;;
     *)
         echo "Unknown option: $1"

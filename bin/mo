@@ -164,22 +164,22 @@ detect_displays() {
 # Function to apply dark room settings
 apply_dark_room() {
     echo -e "\n${YELLOW}Applying dark room settings...${NC}"
-    echo "  Brightness: 15%"
-    echo "  Contrast: 60%"
+    echo "  Brightness: 0%"
+    echo "  Contrast: 70%"
 
     for display in $DISPLAYS; do
         echo -e "  ${BLUE}Configuring Display $display...${NC}"
-        ddcutil setvcp 10 15 --display $display 2>/dev/null || true
-        ddcutil setvcp 12 60 --display $display 2>/dev/null || true
+        ddcutil setvcp 10 0 --display $display 2>/dev/null || true
+        ddcutil setvcp 12 70 --display $display 2>/dev/null || true
         # Saturation is not supported on all monitors
         ddcutil setvcp 8A 40 --display $display 2>/dev/null || true
     done
 
     # Apply redshift if available
     if command -v redshift &> /dev/null; then
-        echo -e "  ${BLUE}Applying blue light filter (4000K)...${NC}"
+        echo -e "  ${BLUE}Applying blue light filter (4500K)...${NC}"
         killall redshift 2>/dev/null || true
-        redshift -P -O 4000 -b 0.8 -m randr &>/dev/null
+        redshift -P -O 4500 -b 0.8 -m randr &>/dev/null
     fi
 
     echo -e "${GREEN}Dark room settings applied!${NC}"

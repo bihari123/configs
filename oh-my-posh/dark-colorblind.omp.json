@@ -141,12 +141,9 @@
         {
           "background": "#1e1e1e",
           "foreground": "#c9d1d9",
-          "properties": {
-            "always_enabled": true
-          },
           "style": "plain",
-          "template": "<transparent>\ue0b0</> \ueba2 {{ .FormattedMs }}\u2800",
-          "type": "executiontime"
+          "template": "<transparent>\ue0b0</> \uf017 {{ .CurrentDate | date \"15:04:05\" }}\u2800",
+          "type": "time"
         },
         {
           "background": "#232323",
@@ -167,13 +164,6 @@
     },
     {
       "segments": [
-        {
-          "background": "#1a1a1a",
-          "foreground": "#c9d1d9",
-          "style": "plain",
-          "template": "<#1a1a1a,transparent>\ue0b6</> \uf489 {{ .Name }} <transparent,#1a1a1a>\ue0b2</>",
-          "type": "shell"
-        },
         {
           "background": "#252525",
           "foreground": "#c9d1d9",
@@ -205,16 +195,6 @@
           "style": "powerline",
           "template": " {{ if not .Error }}{{ .Icon }}{{ .Percentage }}{{ end }}{{ .Error }}\uf295 ",
           "type": "battery"
-        },
-        {
-          "background": "#1f1f1f",
-          "foreground": "#c9d1d9",
-          "invert_powerline": true,
-          "leading_diamond": "\ue0b2",
-          "style": "diamond",
-          "template": " {{ .CurrentDate | date .Format }} ",
-          "trailing_diamond": "\ue0b4",
-          "type": "time"
         }
       ],
       "type": "rprompt"

@@ -144,7 +144,6 @@ From `~/configs/` to home directory:
 
 #### Git Config:
 - ✅ `~/.gitconfig` → `~/configs/.gitconfig` (with delta pager)
-- ✅ `~/.ripgreprc` → `~/configs/.ripgreprc`
 
 #### Terminal & Editors:
 - ✅ `~/.config/tmux/tmux.conf` → `~/configs/tmux/tmux.conf`

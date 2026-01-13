@@ -1656,7 +1656,6 @@ setup_configs() {
 
         # Git config
         ln -sf "$SCRIPT_DIR/.gitconfig" ~/.gitconfig
-        ln -sf "$SCRIPT_DIR/.ripgreprc" ~/.ripgreprc
 
         # Tmux
         mkdir -p ~/.config/tmux
@@ -1852,7 +1851,7 @@ print_summary() {
     echo ""
     echo -e "${MAGENTA}Configurations:${NC}"
     echo -e "  ${GREEN}✓${NC} bashrc, bash_aliases (60+ aliases)"
-    echo -e "  ${GREEN}✓${NC} gitconfig, inputrc, ripgreprc"
+    echo -e "  ${GREEN}✓${NC} gitconfig, inputrc"
     echo -e "  ${GREEN}✓${NC} tmux.conf (Zellij-style keybindings)"
     echo -e "  ${GREEN}✓${NC} alacritty.toml (GitHub Dark theme)"
     echo -e "  ${GREEN}✓${NC} k9s, lazydocker, neovim configs"

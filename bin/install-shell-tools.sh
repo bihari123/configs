@@ -204,23 +204,6 @@ else
     echo -e "${GREEN}✓${NC} Go already installed ($(go version))"
 fi
 
-# Create ripgrep config if it doesn't exist
-echo ""
-echo -e "${YELLOW}Setting up ripgrep config...${NC}"
-if [ ! -f ~/.ripgreprc ]; then
-    cat > ~/.ripgreprc << 'EOF'
-# Default options for ripgrep
---smart-case
---hidden
---glob=!.git/*
---glob=!node_modules/*
---glob=!target/*
---glob=!.cache/*
-EOF
-    print_status "ripgrep config created"
-else
-    echo -e "${GREEN}✓${NC} ripgrep config already exists"
-fi
 
 # Summary
 echo ""

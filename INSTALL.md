@@ -63,7 +63,6 @@ All your dotfiles will be symlinked:
 - `.bash_aliases` - 95+ aliases and functions
 - `.inputrc` - readline configuration
 - `.gitconfig` - git configuration
-- `.ripgreprc` - ripgrep defaults
 - `tmux.conf` - tmux configuration with plugins
 - `alacritty.toml` - terminal configuration
 - `oh-my-posh` theme - prompt theme

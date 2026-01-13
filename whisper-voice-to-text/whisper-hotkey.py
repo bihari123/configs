@@ -290,7 +290,12 @@ class WhisperTranscriberFinal:
     # Change this to use different models:
     # Options: "large-v3", "large-v2", "medium", "small", "base"
     # For English-only: "large-v3.en", "medium.en", "small.en", "base.en"
-    MODEL_NAME = "large-v3"
+    MODEL_NAME = "base"
+
+    # LLM Restructuring Settings
+    ENABLE_LLM_RESTRUCTURE = True  # Set to False to disable LLM restructuring
+    LLM_COMMAND = "claude"  # Command to run LLM (e.g., "claude", "anthropic", "openai")
+    LLM_TIMEOUT = 10  # Timeout in seconds for LLM response
     # =====================================
 
     def __init__(self):
@@ -301,6 +306,7 @@ class WhisperTranscriberFinal:
         self.model_name = self.MODEL_NAME
         self.model_path = f"{self.whisper_path}/models/ggml-{self.model_name}.bin"
         self.should_exit = False
+        self.enable_llm = self.ENABLE_LLM_RESTRUCTURE  # Runtime toggle state
 
         # Check if model exists, download if not
         self._ensure_model_exists()
@@ -309,34 +315,30 @@ class WhisperTranscriberFinal:
         print("Whisper Voice-to-Text Hotkey Service Started!")
         print("Press Ctrl+Alt+R to start recording")
         print("Press Ctrl+Alt+S to stop recording and transcribe")
+        print(f"Press Ctrl+Alt+L to toggle LLM restructuring (currently: {'ON' if self.enable_llm else 'OFF'})")
         print("Press Ctrl+C to exit")
 
     def _ensure_model_exists(self):
         """
         Ensure the specified Whisper model exists, download if necessary.
 
-        CHALLENGE: Manual model management was error-prone and user-unfriendly.
-        SOLUTION: Automatic download with robust error handling and fallback.
-
-        Process:
-        1. Check if model file exists locally
-        2. If not, download using whisper.cpp's official script
-        3. Validate download completed successfully
-        4. Fallback to base model if large-v3 fails
-        5. Exit if even base model fails (critical error)
-
-        Handles:
-        - Network timeouts (10 minute limit)
-        - Download script failures
-        - File system issues
-        - Graceful degradation to smaller models
+        For base model, we use the pre-downloaded test model to avoid download issues.
         """
+        # For base model, use the pre-downloaded test model
+        if self.model_name == "base":
+            test_model_path = f"{self.whisper_path}/models/for-tests-ggml-base.bin"
+            if os.path.exists(test_model_path):
+                self.model_path = test_model_path
+                print(f"✅ Using model: {self.model_name}")
+                return
+
+        # For other models, check if they exist
         if os.path.exists(self.model_path):
             print(f"✅ Using model: {self.model_name}")
             return
 
         print(f"📥 Model {self.model_name} not found, downloading...")
-        print("This may take a few minutes (model is ~1.5GB)...")
+        print("This may take a few minutes...")
 
         try:
             # Download the model using the whisper.cpp script
@@ -351,43 +353,28 @@ class WhisperTranscriberFinal:
                     print(f"✅ Successfully downloaded {self.model_name}")
                 else:
                     print(f"❌ Download script succeeded but model file not found")
-                    self._fallback_to_base_model()
+                    self._fallback_to_test_model()
             else:
                 print(f"❌ Download failed: {result.stderr}")
-                self._fallback_to_base_model()
+                self._fallback_to_test_model()
 
         except subprocess.TimeoutExpired:
             print("❌ Download timed out after 10 minutes")
-            self._fallback_to_base_model()
+            self._fallback_to_test_model()
         except Exception as e:
             print(f"❌ Download error: {e}")
-            self._fallback_to_base_model()
+            self._fallback_to_test_model()
 
-    def _fallback_to_base_model(self):
-        """Fallback to base model if large-v3 fails"""
-        print("🔄 Falling back to base model...")
-        self.model_name = "base"
-        self.model_path = f"{self.whisper_path}/models/ggml-{self.model_name}.bin"
+    def _fallback_to_test_model(self):
+        """Fallback to test model if download fails"""
+        print("🔄 Falling back to test model...")
+        test_model_path = f"{self.whisper_path}/models/for-tests-ggml-base.bin"
 
-        if os.path.exists(self.model_path):
-            print("✅ Using base model")
-            return
-
-        print("📥 Downloading base model...")
-        try:
-            result = subprocess.run([
-                "bash",
-                f"{self.whisper_path}/models/download-ggml-model.sh",
-                self.model_name
-            ], cwd=self.whisper_path, capture_output=True, text=True, timeout=300)
-
-            if result.returncode == 0 and os.path.exists(self.model_path):
-                print("✅ Base model ready")
-            else:
-                print("❌ Failed to download base model")
-                sys.exit(1)
-        except Exception as e:
-            print(f"❌ Critical error: {e}")
+        if os.path.exists(test_model_path):
+            self.model_path = test_model_path
+            print("✅ Using test base model")
+        else:
+            print("❌ No working model found")
             sys.exit(1)
 
     def start_recording(self):
@@ -474,7 +461,7 @@ class WhisperTranscriberFinal:
                 f"{self.whisper_path}/build/bin/whisper-cli",
                 "-m", self.model_path,
                 "-f", self.temp_audio_file.name,
-                "-t", "1", "-l", "en", "--no-prints"
+                "-l", "en", "-np"
             ], capture_output=True, text=True, timeout=15, cwd=self.whisper_path)
 
             if result.returncode == 0:
@@ -496,9 +483,16 @@ class WhisperTranscriberFinal:
                     print(f"\n📝 Transcribed: {transcribed_text}")
                     sys.stdout.flush()  # Force immediate output
 
+                    # Apply LLM restructuring if enabled
+                    final_text = self._restructure_with_llm(transcribed_text)
+
+                    if final_text != transcribed_text:
+                        print(f"✨ Restructured: {final_text}")
+                        sys.stdout.flush()
+
                     # Copy to clipboard
                     try:
-                        pyperclip.copy(transcribed_text)
+                        pyperclip.copy(final_text)
                         print("✅ Copied to clipboard!")
                         sys.stdout.flush()
                     except:
@@ -506,7 +500,7 @@ class WhisperTranscriberFinal:
 
                     # Type the text with special handling for Vim
                     try:
-                        self._insert_text(transcribed_text)
+                        self._insert_text(final_text)
                         print("✅ Text inserted!")
                         sys.stdout.flush()
                     except:
@@ -615,6 +609,93 @@ class WhisperTranscriberFinal:
             return ""
 
         return text.strip()
+
+    def _restructure_with_llm(self, text):
+        """
+        Restructure transcribed text using an LLM for better readability.
+
+        This function sends the raw transcription to an LLM to:
+        - Fix grammar and punctuation
+        - Add proper capitalization
+        - Improve sentence structure
+        - Format lists and bullet points appropriately
+        - Remove filler words and improve clarity
+
+        The LLM is instructed to preserve the original meaning while making
+        the text more professional and readable.
+
+        Args:
+            text (str): Raw transcribed text from Whisper
+
+        Returns:
+            str: Restructured text, or original text if LLM fails
+        """
+        if not self.enable_llm:
+            return text
+
+        if not text or len(text.strip()) < 5:
+            return text  # Skip very short text
+
+        # Check if LLM command is available
+        try:
+            subprocess.run([self.LLM_COMMAND, '--version'],
+                         capture_output=True, check=False, timeout=2)
+        except:
+            print(f"⚠️  LLM command '{self.LLM_COMMAND}' not found, using original text")
+            return text
+
+        prompt = f"""Please restructure the following transcribed text to improve readability:
+
+Rules:
+1. Fix grammar, punctuation, and capitalization
+2. Break up run-on sentences into proper sentences
+3. Remove filler words (um, uh, like, you know) unless they add meaning
+4. Format as proper paragraphs or lists where appropriate
+5. Preserve the original meaning and key information
+6. Keep the text concise and professional
+7. If it's already well-formatted, keep it as is
+
+Text to restructure:
+{text}
+
+Restructured text:"""
+
+        try:
+            print("🤖 Restructuring with AI...")
+            sys.stdout.flush()
+
+            # Run LLM command with the prompt
+            result = subprocess.run(
+                [self.LLM_COMMAND],
+                input=prompt,
+                text=True,
+                capture_output=True,
+                timeout=self.LLM_TIMEOUT
+            )
+
+            if result.returncode == 0:
+                restructured = result.stdout.strip()
+
+                # Basic validation: ensure LLM didn't drastically change the meaning
+                if len(restructured) > len(text) * 3:
+                    print("⚠️  LLM output too long, using original")
+                    return text
+
+                if len(restructured) < len(text) * 0.3:
+                    print("⚠️  LLM output too short, using original")
+                    return text
+
+                return restructured
+            else:
+                print(f"⚠️  LLM error: {result.stderr}")
+                return text
+
+        except subprocess.TimeoutExpired:
+            print("⚠️  LLM restructuring timed out, using original text")
+            return text
+        except Exception as e:
+            print(f"⚠️  LLM restructuring failed: {e}")
+            return text
 
     def _insert_text(self, text):
         """Insert text with special handling for different applications"""
@@ -728,8 +809,22 @@ class WhisperTranscriberFinal:
             ]):
                 self.stop_recording_and_transcribe()
 
+            # Ctrl+Alt+L - toggle LLM restructuring
+            elif any(all(k in self.pressed_keys for k in combo) for combo in [
+                [keyboard.Key.ctrl_l, keyboard.Key.alt_l, keyboard.KeyCode.from_char('l')],
+                [keyboard.Key.ctrl_r, keyboard.Key.alt_r, keyboard.KeyCode.from_char('l')]
+            ]):
+                self.toggle_llm()
+
         except AttributeError:
             pass
+
+    def toggle_llm(self):
+        """Toggle LLM restructuring on/off"""
+        self.enable_llm = not self.enable_llm
+        status = "ON" if self.enable_llm else "OFF"
+        print(f"\n🤖 LLM Restructuring: {status}")
+        sys.stdout.flush()
 
     def on_release(self, key):
         try:

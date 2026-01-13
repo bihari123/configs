@@ -68,7 +68,6 @@
 
 #### Development:
 - `.gitconfig` - Git with delta pager
-- `.ripgreprc` - Ripgrep defaults
 
 #### Terminal:
 - `alacritty/alacritty.toml` - GitHub Dark theme

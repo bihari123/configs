@@ -16,8 +16,11 @@ HISTCONTROL=ignoreboth
 shopt -s histappend
 
 # for setting history length see HISTSIZE and HISTFILESIZE in bash(1)
-HISTSIZE=1000
-HISTFILESIZE=2000
+HISTSIZE=50000
+HISTFILESIZE=100000
+HISTTIMEFORMAT="%F %T "
+shopt -s histverify
+HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"
 
 # check the window size after each command and, if necessary,
 # update the values of LINES and COLUMNS.
@@ -115,13 +118,12 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-export PATH=$PATH:/usr/local/go/bin
-export PATH=$PATH:/home/tarun/.local/bin
-export PATH=$PATH:$HOME/go/bin
-# Start prompt at the bottom of terminal (only when not in tmux)
-if [ -z "$TMUX" ]; then
-    printf '\033[2J\033[999B'
-fi
+# Efficient PATH setup - consolidated exports
+export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/go/bin:$HOME/go/bin:$PATH"
+# Start prompt at the bottom of terminal (only when not in tmux) - disabled for speed
+# if [ -z "$TMUX" ]; then
+#     printf '\033[2J\033[999B'
+# fi
 
 # ============================================================================
 # Bash Auto-Suggestions & Syntax Highlighting (ble.sh)
@@ -129,7 +131,7 @@ fi
 # Install with: git clone --recursive --depth 1 --shallow-submodules https://github.com/akinomyoga/ble.sh.git ~/.local/share/blesh
 # Then run: make -C ~/.local/share/blesh install PREFIX=~/.local
 if [[ -f ~/.local/share/blesh/ble.sh ]]; then
-    source ~/.local/share/blesh/ble.sh --noattach
+    source ~/.local/share/blesh/ble.sh
 fi
 
 eval "$(oh-my-posh init bash --config ~/.config/oh-my-posh-dark-colorblind.omp.json)"
@@ -137,23 +139,16 @@ eval "$(oh-my-posh init bash --config ~/.config/oh-my-posh-dark-colorblind.omp.j
 #eval "$(starship init bash)"
 . "$HOME/.cargo/env"
 
+# NVM - Immediate load
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 export PATH="$HOME/bin:$PATH"
 export VCPKG_ROOT=~/vcpkg
 
 # ============================================================================
 # ENHANCED TERMINAL WORKFLOW
 # ============================================================================
-
-# Better History Settings
-HISTSIZE=50000
-HISTFILESIZE=100000
-HISTTIMEFORMAT="%F %T "
-shopt -s histverify
-shopt -s histappend  # Append to history file, don't overwrite
-HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history"
 
 # For tmux-resurrect: save history after each command
 if [ -n "$TMUX" ]; then
@@ -175,8 +170,6 @@ export LESS='-R -M --shift 5'
 # Man pages with bat (when installed)
 export MANPAGER="sh -c 'col -bx | bat -l man -p 2>/dev/null || less'"
 
-# Ripgrep config
-export RIPGREP_CONFIG_PATH=~/.ripgreprc
 
 # FZF Configuration
 export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
@@ -189,12 +182,10 @@ export FZF_DEFAULT_OPTS="--color=bg+:#2d2d2d,bg:#0d1117,spinner:#3fb950,hl:#ff7b
 --color=marker:#3fb950,fg+:#c9d1d9,prompt:#58a6ff,hl+:#ff7b72 \
 --height 40% --layout=reverse --border --preview-window=right:60%"
 
-# Enable FZF keybindings (Ctrl+R for history, Ctrl+T for files, Alt+C for cd)
+# Enable FZF keybindings and completion - immediate load
 if [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
     source /usr/share/doc/fzf/examples/key-bindings.bash
 fi
-
-# Enable FZF completion
 if [ -f /usr/share/doc/fzf/examples/completion.bash ]; then
     source /usr/share/doc/fzf/examples/completion.bash
 fi
@@ -235,18 +226,22 @@ fkill() {
 }
 
 # ============================================================================
-# Attach ble.sh (must be at the end of bashrc)
+# ble.sh is auto-attached when sourced with --
 # ============================================================================
-[[ ${BLE_VERSION-} ]] && ble-attach
 
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/bin:$PATH"
-export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/bin:$PATH"
-
-# Pyenv
+# Pyenv - Immediate load
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
-export PATH="$HOME/bin:$PATH"
+# Final environment variables
+export MY_INSTALL_DIR="$HOME/.local"
+export XDG_DATA_DIRS="/var/lib/flatpak/exports/share:/home/tarun/.local/share/flatpak/exports/share:$XDG_DATA_DIRS"
+
+# opencode
+export PATH=/home/tarun/.opencode/bin:$PATH
+export OPENCODE_CONFIG=~/.config/opencode/opencode.json
+export OPENCODE_CONFIG=~/.config/opencode/opencode.json
+
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+export USE_GKE_GCLOUD_AUTH_PLUGIN=True
