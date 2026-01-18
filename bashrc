@@ -245,3 +245,4 @@ export OPENCODE_CONFIG=~/.config/opencode/opencode.json
 
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+export HELIX_RUNTIME=/home/tarun/helix/runtime
