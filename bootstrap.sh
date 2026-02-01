@@ -128,7 +128,7 @@ install_base_packages() {
                 apt-transport-https \
                 ca-certificates \
                 gnupg \
-                lsb-release
+                lsb-release 
             ;;
         pacman)
             $PKG_INSTALL \
@@ -571,55 +571,125 @@ install_vcpkg() {
 # =============================================================================
 
 install_alacritty() {
-    step "Installing Alacritty"
+    step "Installing Alacritty (from source)"
 
     if command_exists alacritty; then
         info "Alacritty already installed"
         return
     fi
 
+    # Install build dependencies
+    info "Installing Alacritty build dependencies..."
     case "$PKG_MANAGER" in
         apt)
-            # Add PPA for Ubuntu/Debian
-            sudo add-apt-repository ppa:aslatter/ppa -y || true
-            sudo apt update
-            $PKG_INSTALL alacritty || {
-                warning "PPA installation failed, trying cargo..."
-                cargo install alacritty
-            }
+            $PKG_INSTALL \
+                cmake \
+                g++ \
+                pkg-config \
+                python3 \
+                libfreetype6-dev \
+                libfontconfig1-dev \
+                libxcb-xfixes0-dev \
+                libxkbcommon-dev \
+                zlib1g-dev \
+                libssl-dev \
+                libx11-dev \
+                libx11-xcb-dev \
+                libxcb-dri3-dev \
+                libxcb-cursor-dev || true
             ;;
         pacman)
-            $PKG_INSTALL alacritty
+            $PKG_INSTALL \
+                cmake \
+                pkgconf \
+                freetype2 \
+                fontconfig \
+                libxcb \
+                libxkbcommon \
+                zlib \
+                openssl \
+                libx11 \
+                xcb-util
             ;;
         dnf|yum)
-            $PKG_INSTALL alacritty || {
-                warning "Package not found, trying cargo..."
-                cargo install alacritty
-            }
+            $PKG_INSTALL \
+                cmake \
+                pkg-config \
+                freetype-devel \
+                fontconfig-devel \
+                libxcb-devel \
+                libxkbcommon-devel \
+                zlib-devel \
+                openssl-devel \
+                libX11-devel \
+                libX11-xcb-devel \
+                libxcb-devel || true
             ;;
     esac
 
-    success "Alacritty installed"
+    # Ensure Rust is available
+    if ! command_exists cargo; then
+        info "Installing Rust (required for building Alacritty)..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source "$HOME/.cargo/env"
+    fi
+
+    # Clone and build Alacritty
+    info "Cloning Alacritty repository..."
+    TMP=$(mktemp -d)
+    cd "$TMP"
+
+    if git clone https://github.com/alacritty/alacritty.git; then
+        cd alacritty
+
+        info "Building Alacritty (this may take a few minutes)..."
+        if cargo build --release; then
+            # Install binary
+            sudo cp target/release/alacritty /usr/local/bin
+            sudo chmod +x /usr/local/bin/alacritty
+
+            # Install desktop entry (optional)
+            if [ ! -f ~/.local/share/applications/Alacritty.desktop ]; then
+                mkdir -p ~/.local/share/applications
+                sudo cp extra/logo/alacritty-term.svg /usr/share/icons/hicolor/scalable/apps/Alacritty.svg 2>/dev/null || true
+                sed -e 's/Icon=alacritty/Icon=Alacritty/g' extra/linux/Alacritty.desktop > ~/.local/share/applications/Alacritty.desktop 2>/dev/null || true
+            fi
+
+            # Install man page
+            sudo mkdir -p /usr/local/share/man/man1
+            sed -e "s/%VERSION%/$(grep '^version =' Cargo.toml | head -n1 | awk '{print $3}' | tr -d '"')/g" extra/alacritty.man |
+                gzip -c |
+                sudo tee /usr/local/share/man/man1/alacritty.1.gz >/dev/null
+
+            # Install terminfo file for proper terminal functionality
+            info "Installing terminfo entries..."
+            sudo tic -xe alacritty,alacritty-direct extra/alacritty.info
+
+            cd / && rm -rf "$TMP"
+            success "Alacritty installed from source"
+        else
+            error "Failed to build Alacritty"
+            cd / && rm -rf "$TMP"
+            return 1
+        fi
+    else
+        error "Failed to clone Alacritty repository"
+        cd / && rm -rf "$TMP"
+        return 1
+    fi
 }
 
 # =============================================================================
-# Install FiraCode Nerd Font
+# Install Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)
 # =============================================================================
 
 install_nerd_fonts() {
-    step "Installing FiraCode Nerd Font"
+    step "Installing Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
 
     FONT_DIR="$HOME/.local/share/fonts"
-    FONT_NAME="FiraCode"
 
     # Get latest version
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "3.1.1")
-
-    if fc-list | grep -qi "FiraCode.*Nerd"; then
-        info "FiraCode Nerd Font already installed"
-        # Note: Font version checking is complex, skipping version check for now
-        return
-    fi
+    LATEST_VERSION=$(curl -s https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "3.2.1")
 
     mkdir -p "$FONT_DIR"
 
@@ -627,27 +697,44 @@ install_nerd_fonts() {
     PREV_DIR=$(pwd)
     cd "$FONT_DIR" || { warning "Failed to access font directory"; return 1; }
 
-    info "Downloading FiraCode Nerd Font v${LATEST_VERSION}..."
-    if wget -q --show-progress "https://github.com/ryanoasis/nerd-fonts/releases/download/v${LATEST_VERSION}/FiraCode.zip" -O FiraCode.zip 2>/dev/null; then
-        if [ -f FiraCode.zip ]; then
-            unzip -o FiraCode.zip -d "$FONT_NAME" 2>&1 | grep -v "Archive:" || true
-            rm -f FiraCode.zip
+    # Array of fonts to install
+    local fonts=(
+        "FiraCode:FiraCode"
+        "Iosevka:Iosevka"
+        "ProggyClean:ProggyClean"
+        "Lekton:Lekton"
+    )
 
-            # Refresh font cache
-            fc-cache -fv >/dev/null 2>&1
+    for font_entry in "${fonts[@]}"; do
+        IFS=':' read -r font_name font_dir <<< "$font_entry"
 
-            success "FiraCode Nerd Font installed"
-            info "Configure your terminal to use 'FiraCode Nerd Font'"
-        else
-            warning "FiraCode Nerd Font download incomplete, skipping..."
-            cd "$PREV_DIR" || cd "$HOME"
-            return 0
+        if fc-list | grep -qi "${font_name}.*Nerd"; then
+            info "${font_name} Nerd Font already installed, skipping..."
+            continue
         fi
-    else
-        warning "Failed to download FiraCode Nerd Font, skipping..."
-        cd "$PREV_DIR" || cd "$HOME"
-        return 0
-    fi
+
+        info "Downloading ${font_name} Nerd Font v${LATEST_VERSION}..."
+        if wget -q --show-progress "https://github.com/ryanoasis/nerd-fonts/releases/download/v${LATEST_VERSION}/${font_name}.zip" -O "${font_name}.zip" 2>/dev/null; then
+            if [ -f "${font_name}.zip" ]; then
+                unzip -o "${font_name}.zip" -d "${font_dir}" 2>&1 | grep -v "Archive:" || true
+                rm -f "${font_name}.zip"
+                success "${font_name} Nerd Font installed"
+            else
+                warning "${font_name} Nerd Font download incomplete, skipping..."
+            fi
+        else
+            warning "Failed to download ${font_name} Nerd Font, skipping..."
+        fi
+    done
+
+    # Refresh font cache
+    fc-cache -fv >/dev/null 2>&1
+
+    info "Configure your terminal to use any of these fonts:"
+    info "  - FiraCode Nerd Font"
+    info "  - Iosevka Nerd Font (or Iosevka Nerd Font Mono)"
+    info "  - ProggyClean Nerd Font"
+    info "  - Lekton Nerd Font (or Lekton Nerd Font Mono)"
 
     # Return to previous directory
     cd "$PREV_DIR" || cd "$HOME"
@@ -746,6 +833,17 @@ install_multimedia_tools() {
     success "Multimedia tools installed"
 }
 
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+append_if_missing() {
+    local line="$1"
+    local file="$2"
+    grep -qxF "$line" "$file" 2>/dev/null || echo "$line" | sudo tee -a "$file"
+}
+
+
 # =============================================================================
 # Install C++23 Build Tools
 # =============================================================================
@@ -755,60 +853,114 @@ install_cpp_build_tools() {
 
     case "$PKG_MANAGER" in
         apt)
-            # Add LLVM repository for latest clang
-            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-            sudo add-apt-repository -y "deb http://apt.llvm.org/$(lsb_release -cs)/ llvm-toolchain-$(lsb_release -cs) main" || true
+	     set -e
 
-            # Add toolchain PPA for latest GCC
-            sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test || true
-            sudo apt update
+    echo "[*] Installing base build tools (distro only)"
+    sudo apt update
+    sudo apt install -y \
+        build-essential \
+        gcc \
+        g++ \
+        clang \
+        clang-format \
+        clang-tidy \
+        lldb \
+        lld \
+        cmake \
+        ninja-build \
+        ccache \
+        meson \
+        autoconf \
+        automake \
+        libtool \
+        pkg-config \
+        libboost-all-dev \
+        libeigen3-dev \
+        libfmt-dev \
+        libspdlog-dev \
+        catch2 \
+        libgtest-dev \
+        libgmock-dev \
+        libbenchmark-dev \
+        valgrind \
+        gdb \
+        wget \
+        xz-utils \
+        ca-certificates
 
-            $PKG_INSTALL \
-                build-essential \
-                gcc-13 \
-                g++-13 \
-                gcc-14 \
-                g++-14 \
-                clang-18 \
-                clang++-18 \
-                clang-format-18 \
-                clang-tidy-18 \
-                lldb-18 \
-                lld-18 \
-                libc++-18-dev \
-                libc++abi-18-dev \
-                cmake \
-                ninja-build \
-                ccache \
-                meson \
-                autoconf \
-                automake \
-                libtool \
-                pkg-config \
-                libboost-all-dev \
-                libeigen3-dev \
-                libfmt-dev \
-                libspdlog-dev \
-                catch2 \
-                libgtest-dev \
-                libgmock-dev \
-                libbenchmark-dev \
-                valgrind \
-                gdb \
-                lldb-18 || true
+    ############################################
+    # LLVM 18 (official binaries → /opt)
+    ############################################
+    LLVM_VERSION="18.1.8"
+    LLVM_DIR="/opt/llvm-18"
 
-            # Set GCC 13 as default if installed
-            if command_exists gcc-13; then
-                sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100 || true
-                sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100 || true
-            fi
+    if [ ! -d "$LLVM_DIR" ]; then
+        echo "[*] Installing LLVM ${LLVM_VERSION}"
+        TMP=$(mktemp -d)
+        cd "$TMP"
 
-            # Set Clang 18 as alternative
-            if command_exists clang-18; then
-                sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 || true
-                sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100 || true
-            fi
-            ;;
+        wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+        sudo tar -C /opt -xf clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+        sudo mv /opt/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04 "$LLVM_DIR"
+
+        cd /
+        rm -rf "$TMP"
+    else
+        echo "[*] LLVM 18 already installed"
+    fi
+
+    ############################################
+    # GCC 14 (built once → /opt)
+    ############################################
+    GCC_VERSION="14.1.0"
+    GCC_DIR="/opt/gcc-14"
+
+    if [ ! -d "$GCC_DIR" ]; then
+        echo "[*] Building GCC ${GCC_VERSION} (this takes time)"
+        sudo apt install -y \
+            libgmp-dev \
+            libmpfr-dev \
+            libmpc-dev \
+            flex \
+            bison
+
+        TMP=$(mktemp -d)
+        cd "$TMP"
+
+        wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
+        tar xf gcc-${GCC_VERSION}.tar.xz
+        cd gcc-${GCC_VERSION}
+
+        ./configure \
+            --prefix="$GCC_DIR" \
+            --disable-multilib \
+            --enable-languages=c,c++
+
+        make -j"$(nproc)"
+        sudo make install
+
+        cd /
+        rm -rf "$TMP"
+    else
+        echo "[*] GCC 14 already installed"
+    fi
+
+    ############################################
+    # System-wide environment (safe)
+    ############################################
+    echo "[*] Configuring system-wide toolchain environment"
+
+    ENV_FILE="/etc/profile.d/toolchains.sh"
+
+    append_if_missing 'export PATH=/opt/llvm-18/bin:/opt/gcc-14/bin:$PATH' "$ENV_FILE"
+    append_if_missing 'export CC=clang' "$ENV_FILE"
+    append_if_missing 'export CXX=clang++' "$ENV_FILE"
+
+    sudo chmod 644 "$ENV_FILE"
+
+    echo "[✓] Toolchain setup complete"	
+
+          ;;
         pacman)
             $PKG_INSTALL \
                 base-devel \
@@ -1836,7 +1988,7 @@ print_summary() {
     echo ""
     echo -e "${MAGENTA}Terminal & Fonts:${NC}"
     echo -e "  ${GREEN}✓${NC} Alacritty (GPU-accelerated terminal)"
-    echo -e "  ${GREEN}✓${NC} FiraCode Nerd Font (with icons)"
+    echo -e "  ${GREEN}✓${NC} Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
     echo -e "  ${GREEN}✓${NC} Tmux (with 5 plugins)"
     echo ""
     echo -e "${MAGENTA}Shell Enhancements:${NC}"
@@ -1882,7 +2034,7 @@ print_summary() {
     echo ""
     echo "  6. ${YELLOW}Install fonts for icons:${NC}"
     echo "     https://www.nerdfonts.com/font-downloads"
-    echo "     Recommended: FiraCode Nerd Font"
+    echo "     Installed: FiraCode, Iosevka, Proggy Clean, Lekton"
     echo ""
     if groups | grep -q docker; then
         echo -e "${GREEN}✓${NC} You're in the docker group"
@@ -1987,7 +2139,7 @@ custom_installation() {
     echo "  10) Sesh (tmux session manager)"
     echo "  11) NVM (Node Version Manager)"
     echo "  12) Alacritty (terminal emulator)"
-    echo "  13) FiraCode Nerd Font"
+    echo "  13) Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
     echo "  14) Docker + Docker Compose"
     echo "  15) Kubernetes tools (kubectl, helm, minikube, kind, k9s, kubectx)"
     echo "  16) ble.sh (bash auto-suggestions)"

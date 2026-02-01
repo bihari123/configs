@@ -134,15 +134,11 @@ if [[ -f ~/.local/share/blesh/ble.sh ]]; then
     source ~/.local/share/blesh/ble.sh
 fi
 
-eval "$(oh-my-posh init bash --config ~/.config/oh-my-posh-dark-colorblind.omp.json)"
+eval "$(starship init bash)"
 
 #eval "$(starship init bash)"
 . "$HOME/.cargo/env"
 
-# NVM - Immediate load
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 export PATH="$HOME/bin:$PATH"
 export VCPKG_ROOT=~/vcpkg
 
@@ -238,11 +234,8 @@ eval "$(pyenv virtualenv-init -)"
 export MY_INSTALL_DIR="$HOME/.local"
 export XDG_DATA_DIRS="/var/lib/flatpak/exports/share:/home/tarun/.local/share/flatpak/exports/share:$XDG_DATA_DIRS"
 
-# opencode
-export PATH=/home/tarun/.opencode/bin:$PATH
-export OPENCODE_CONFIG=~/.config/opencode/opencode.json
-export OPENCODE_CONFIG=~/.config/opencode/opencode.json
 
-eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-export HELIX_RUNTIME=/home/tarun/helix/runtime
+
+export NVM_DIR="$HOME/.config/nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
