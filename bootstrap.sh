@@ -191,7 +191,15 @@ install_modern_cli_tools() {
                 sudo apt install -y eza
             fi
 
-            $PKG_INSTALL ripgrep fd-find fzf tmux neovim python3-pip
+            # Install all CLI tools including ones used by tmux scripts
+            $PKG_INSTALL ripgrep fd-find fzf tmux neovim python3-pip \
+                jq tree btop htop tig ddcutil
+
+            # Create fd symlink for Debian/Ubuntu (fd-find is installed as fdfind)
+            if ! command_exists fd && command_exists fdfind; then
+                info "Creating fd symlink for fdfind..."
+                sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd
+            fi
             ;;
         pacman)
             $PKG_INSTALL \
@@ -205,7 +213,8 @@ install_modern_cli_tools() {
                 python-pip \
                 btop \
                 dust \
-                duf
+                duf \
+                ddcutil
             ;;
         dnf|yum)
             $PKG_INSTALL \
@@ -215,7 +224,13 @@ install_modern_cli_tools() {
                 fzf \
                 tmux \
                 neovim \
-                python3-pip
+                python3-pip \
+                jq \
+                tree \
+                btop \
+                htop \
+                tig \
+                ddcutil
 
             # Install eza from binary
             if ! command_exists eza; then

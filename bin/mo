@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Monitor Optimizer Script
-# Automatically adjusts monitor settings for dark/lit room environments
+# Automatically adjusts monitor settings for dim/lit room environments
 
 set -e
 
@@ -124,7 +124,7 @@ install_to_system() {
 }
 
 # Quick switch mode (for command line arguments) - check early to skip interactive setup
-if [ "$1" = "dark" ] || [ "$1" = "lit" ] || [ "$1" = "light" ] || [ "$1" = "status" ]; then
+if [ "$1" = "dim" ] || [ "$1" = "dark" ] || [ "$1" = "lit" ] || [ "$1" = "light" ] || [ "$1" = "status" ]; then
     # For quick commands, just check dependencies silently
     if ! command -v ddcutil &> /dev/null; then
         echo -e "${RED}Error: ddcutil not installed. Please run 'mo' without arguments to install dependencies.${NC}"
@@ -135,6 +135,7 @@ elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo
     echo "Usage:"
     echo "  $0          - Interactive mode"
+    echo "  $0 dim      - Quick switch to dim room settings"
     echo "  $0 dark     - Quick switch to dark room settings"
     echo "  $0 lit      - Quick switch to lit room settings"
     echo "  $0 status   - Show current settings"
@@ -165,6 +166,28 @@ detect_displays() {
 apply_dark_room() {
     echo -e "\n${YELLOW}Applying dark room settings...${NC}"
     echo "  Brightness: 0%"
+    echo "  Contrast: 75%"
+
+    for display in $DISPLAYS; do
+        echo -e "  ${BLUE}Configuring Display $display...${NC}"
+        ddcutil setvcp 10 0 --display $display 2>/dev/null || true
+        ddcutil setvcp 12 75 --display $display 2>/dev/null || true
+    done
+
+    # Apply redshift if available
+    if command -v redshift &> /dev/null; then
+        echo -e "  ${BLUE}Applying blue light filter (4500K)...${NC}"
+        killall redshift 2>/dev/null || true
+        redshift -P -O 4500 -b 0.7 -m randr &>/dev/null
+    fi
+
+    echo -e "${GREEN}Dark room settings applied!${NC}"
+}
+
+# Function to apply dim room settings
+apply_dim_room() {
+    echo -e "\n${YELLOW}Applying dim room settings...${NC}"
+    echo "  Brightness: 0%"
     echo "  Contrast: 70%"
 
     for display in $DISPLAYS; do
@@ -182,7 +205,7 @@ apply_dark_room() {
         redshift -P -O 4500 -b 0.8 -m randr &>/dev/null
     fi
 
-    echo -e "${GREEN}Dark room settings applied!${NC}"
+    echo -e "${GREEN}Dim room settings applied!${NC}"
 }
 
 # Function to apply lit room settings
@@ -251,7 +274,9 @@ main_menu() {
         read -n 1 apply_last
         echo
         if [[ $apply_last =~ ^[Yy]$ ]]; then
-            if [ "$PROFILE" = "dark" ]; then
+            if [ "$PROFILE" = "dim" ]; then
+                apply_dim_room
+            elif [ "$PROFILE" = "dark" ]; then
                 apply_dark_room
             else
                 apply_lit_room
@@ -262,12 +287,13 @@ main_menu() {
     fi
     
     echo -e "\n${YELLOW}Select your environment:${NC}"
-    echo "1) Dark room (low light)"
-    echo "2) Well-lit room"
-    echo "3) Show current settings"
-    echo "4) Exit"
+    echo "1) Dark room (very low light)"
+    echo "2) Dim room (low light)"
+    echo "3) Well-lit room"
+    echo "4) Show current settings"
+    echo "5) Exit"
     echo
-    read -p "Enter your choice (1-4): " choice
+    read -p "Enter your choice (1-5): " choice
     
     case $choice in
         1)
@@ -275,16 +301,20 @@ main_menu() {
             save_profile "dark"
             ;;
         2)
+            apply_dim_room
+            save_profile "dim"
+            ;;
+        3)
             apply_lit_room
             save_profile "lit"
             ;;
-        3)
+        4)
             show_current
             echo -e "\nPress any key to continue..."
             read -n 1
             main_menu
             ;;
-        4)
+        5)
             echo -e "${GREEN}Goodbye!${NC}"
             exit 0
             ;;
@@ -302,6 +332,12 @@ case "$1" in
         detect_displays > /dev/null 2>&1
         apply_dark_room
         save_profile "dark"
+        exit 0
+        ;;
+    dim)
+        detect_displays > /dev/null 2>&1
+        apply_dim_room
+        save_profile "dim"
         exit 0
         ;;
     lit|light)
