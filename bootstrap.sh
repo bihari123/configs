@@ -6,7 +6,7 @@
 # Sets up: Modern CLI tools, Docker/K8s tools, shell enhancements, configs
 # =============================================================================
 
-set -e  # Exit on error
+set -e # Exit on error
 
 # Colors for output
 RED='\033[0;31m'
@@ -18,34 +18,34 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Script directory
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # =============================================================================
 # Helper Functions
 # =============================================================================
 
 info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+  echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 success() {
-    echo -e "${GREEN}[✓]${NC} $1"
+  echo -e "${GREEN}[✓]${NC} $1"
 }
 
 error() {
-    echo -e "${RED}[✗]${NC} $1"
+  echo -e "${RED}[✗]${NC} $1"
 }
 
 warning() {
-    echo -e "${YELLOW}[!]${NC} $1"
+  echo -e "${YELLOW}[!]${NC} $1"
 }
 
 step() {
-    echo -e "\n${MAGENTA}==>${NC} ${CYAN}$1${NC}\n"
+  echo -e "\n${MAGENTA}==>${NC} ${CYAN}$1${NC}\n"
 }
 
 command_exists() {
-    command -v "$1" >/dev/null 2>&1
+  command -v "$1" >/dev/null 2>&1
 }
 
 # =============================================================================
@@ -53,51 +53,51 @@ command_exists() {
 # =============================================================================
 
 detect_distro() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        DISTRO=$ID
-        DISTRO_VERSION=$VERSION_ID
-    elif [ -f /etc/lsb-release ]; then
-        . /etc/lsb-release
-        DISTRO=$DISTRIB_ID
-        DISTRO_VERSION=$DISTRIB_RELEASE
+  if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    DISTRO=$ID
+    DISTRO_VERSION=$VERSION_ID
+  elif [ -f /etc/lsb-release ]; then
+    . /etc/lsb-release
+    DISTRO=$DISTRIB_ID
+    DISTRO_VERSION=$DISTRIB_RELEASE
+  else
+    DISTRO=$(uname -s)
+    DISTRO_VERSION=$(uname -r)
+  fi
+
+  DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
+
+  case "$DISTRO" in
+  ubuntu | debian | pop | linuxmint)
+    PKG_MANAGER="apt"
+    PKG_UPDATE="sudo apt update"
+    PKG_INSTALL="sudo apt install -y"
+    ;;
+  arch | manjaro | endeavouros)
+    PKG_MANAGER="pacman"
+    PKG_UPDATE="sudo pacman -Sy"
+    PKG_INSTALL="sudo pacman -S --noconfirm"
+    ;;
+  rhel | centos | fedora | rocky | almalinux)
+    if command_exists dnf; then
+      PKG_MANAGER="dnf"
+      PKG_UPDATE="sudo dnf check-update || true"
+      PKG_INSTALL="sudo dnf install -y"
     else
-        DISTRO=$(uname -s)
-        DISTRO_VERSION=$(uname -r)
+      PKG_MANAGER="yum"
+      PKG_UPDATE="sudo yum check-update || true"
+      PKG_INSTALL="sudo yum install -y"
     fi
+    ;;
+  *)
+    error "Unsupported distribution: $DISTRO"
+    exit 1
+    ;;
+  esac
 
-    DISTRO=$(echo "$DISTRO" | tr '[:upper:]' '[:lower:]')
-
-    case "$DISTRO" in
-        ubuntu|debian|pop|linuxmint)
-            PKG_MANAGER="apt"
-            PKG_UPDATE="sudo apt update"
-            PKG_INSTALL="sudo apt install -y"
-            ;;
-        arch|manjaro|endeavouros)
-            PKG_MANAGER="pacman"
-            PKG_UPDATE="sudo pacman -Sy"
-            PKG_INSTALL="sudo pacman -S --noconfirm"
-            ;;
-        rhel|centos|fedora|rocky|almalinux)
-            if command_exists dnf; then
-                PKG_MANAGER="dnf"
-                PKG_UPDATE="sudo dnf check-update || true"
-                PKG_INSTALL="sudo dnf install -y"
-            else
-                PKG_MANAGER="yum"
-                PKG_UPDATE="sudo yum check-update || true"
-                PKG_INSTALL="sudo yum install -y"
-            fi
-            ;;
-        *)
-            error "Unsupported distribution: $DISTRO"
-            exit 1
-            ;;
-    esac
-
-    info "Detected: $DISTRO $DISTRO_VERSION"
-    info "Package Manager: $PKG_MANAGER"
+  info "Detected: $DISTRO $DISTRO_VERSION"
+  info "Package Manager: $PKG_MANAGER"
 }
 
 # =============================================================================
@@ -105,63 +105,65 @@ detect_distro() {
 # =============================================================================
 
 install_base_packages() {
-    step "Installing base packages"
+  step "Installing base packages"
 
-    $PKG_UPDATE
+  $PKG_UPDATE
 
-    case "$PKG_MANAGER" in
-        apt)
-            $PKG_INSTALL \
-                build-essential \
-                git \
-                curl \
-                wget \
-                unzip \
-                tar \
-                gzip \
-                make \
-                gcc \
-                g++ \
-                pkg-config \
-                libssl-dev \
-                software-properties-common \
-                apt-transport-https \
-                ca-certificates \
-                gnupg \
-                lsb-release 
-            ;;
-        pacman)
-            $PKG_INSTALL \
-                base-devel \
-                git \
-                curl \
-                wget \
-                unzip \
-                tar \
-                gzip \
-                make \
-                gcc \
-                openssl \
-                pkgconf
-            ;;
-        dnf|yum)
-            $PKG_INSTALL \
-                @development-tools \
-                git \
-                curl \
-                wget \
-                unzip \
-                tar \
-                gzip \
-                make \
-                gcc \
-                gcc-c++ \
-                openssl-devel \
-                pkgconfig
-            ;;
-    esac
+  case "$PKG_MANAGER" in
+  apt)
+    $PKG_INSTALL \
+      build-essential \
+      git \
+      curl \
+      wget \
+      unzip \
+      tar \
+      gzip \
+      make \
+      gcc \
+      g++ \
+      file \
+      procps \
+      pkg-config \
+      libssl-dev \
+      software-properties-common \
+      apt-transport-https \
+      ca-certificates \
+      gnupg \
+      lsb-release
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      base-devel \
+      git \
+      curl \
+      wget \
+      unzip \
+      tar \
+      gzip \
+      make \
+      gcc \
+      openssl \
+      pkgconf
+    ;;
+  dnf | yum)
+    $PKG_INSTALL \
+      @development-tools \
+      git \
+      curl \
+      wget \
+      unzip \
+      tar \
+      gzip \
+      make \
+      gcc \
+      gcc-c++ \
+      openssl-devel \
+      pkgconfig
+    ;;
+  esac
 
-    success "Base packages installed"
+  success "Base packages installed"
 }
 
 # =============================================================================
@@ -169,210 +171,216 @@ install_base_packages() {
 # =============================================================================
 
 install_modern_cli_tools() {
-    step "Installing modern CLI tools"
+  step "Installing modern CLI tools"
 
-    case "$PKG_MANAGER" in
-        apt)
-            # Add repositories if needed
-            if ! command_exists bat; then
-                info "Installing bat..."
-                wget -q https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_amd64.deb -O /tmp/bat.deb
-                sudo dpkg -i /tmp/bat.deb || true
-                rm /tmp/bat.deb
-            fi
+  case "$PKG_MANAGER" in
+  apt)
+    # Add repositories if needed
+    if ! command_exists bat; then
+      info "Installing bat..."
+      wget -q https://github.com/sharkdp/bat/releases/download/v0.24.0/bat_0.24.0_amd64.deb -O /tmp/bat.deb
+      sudo dpkg -i /tmp/bat.deb || true
+      rm /tmp/bat.deb
+    fi
 
-            if ! command_exists eza; then
-                info "Installing eza..."
-                sudo mkdir -p /etc/apt/keyrings
-                wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
-                echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
-                sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
-                sudo apt update
-                sudo apt install -y eza
-            fi
+    if ! command_exists eza; then
+      info "Installing eza..."
+      sudo mkdir -p /etc/apt/keyrings
+      wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+      sudo chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list
+      sudo apt update
+      sudo apt install -y eza
+    fi
 
-            # Install all CLI tools including ones used by tmux scripts
-            $PKG_INSTALL ripgrep fd-find fzf tmux neovim python3-pip \
-                jq tree btop htop tig ddcutil
+    # Install all CLI tools including ones used by tmux scripts
+    $PKG_INSTALL ripgrep fd-find fzf tmux neovim python3-pip \
+      jq tree btop htop tig ddcutil
 
-            # Create fd symlink for Debian/Ubuntu (fd-find is installed as fdfind)
-            if ! command_exists fd && command_exists fdfind; then
-                info "Creating fd symlink for fdfind..."
-                sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd
-            fi
-            ;;
-        pacman)
-            $PKG_INSTALL \
-                bat \
-                eza \
-                ripgrep \
-                fd \
-                fzf \
-                tmux \
-                neovim \
-                python-pip \
-                btop \
-                dust \
-                duf \
-                ddcutil
-            ;;
-        dnf|yum)
-            $PKG_INSTALL \
-                bat \
-                ripgrep \
-                fd-find \
-                fzf \
-                tmux \
-                neovim \
-                python3-pip \
-                jq \
-                tree \
-                btop \
-                htop \
-                tig \
-                ddcutil
+    # Create fd symlink for Debian/Ubuntu (fd-find is installed as fdfind)
+    if ! command_exists fd && command_exists fdfind; then
+      info "Creating fd symlink for fdfind..."
+      sudo ln -sf /usr/bin/fdfind /usr/local/bin/fd
+    fi
 
-            # Install eza from binary
-            if ! command_exists eza; then
-                info "Installing eza from binary..."
-                if wget -q https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz -O /tmp/eza.tar.gz 2>/dev/null; then
-                    sudo tar xzf /tmp/eza.tar.gz -C /usr/local/bin 2>/dev/null || warning "Failed to extract eza"
-                    rm -f /tmp/eza.tar.gz
-                else
-                    warning "Failed to download eza, skipping..."
-                fi
-            fi
-            ;;
-    esac
+    if ! command_exists sesh; then
+      info "Installing sesh..."
+      go install github.com/joshmedeski/sesh/v2@latest
+    fi
 
-    # Install tools not in repos via cargo/binary
-    install_rust_tools
-    install_binary_tools
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      bat \
+      eza \
+      ripgrep \
+      fd \
+      fzf \
+      tmux \
+      neovim \
+      python-pip \
+      btop \
+      dust \
+      duf \
+      ddcutil
+    ;;
+  dnf | yum)
+    $PKG_INSTALL \
+      bat \
+      ripgrep \
+      fd-find \
+      fzf \
+      tmux \
+      neovim \
+      python3-pip \
+      jq \
+      tree \
+      btop \
+      htop \
+      tig \
+      ddcutil
 
-    success "Modern CLI tools installed"
+    # Install eza from binary
+    if ! command_exists eza; then
+      info "Installing eza from binary..."
+      if wget -q https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz -O /tmp/eza.tar.gz 2>/dev/null; then
+        sudo tar xzf /tmp/eza.tar.gz -C /usr/local/bin 2>/dev/null || warning "Failed to extract eza"
+        rm -f /tmp/eza.tar.gz
+      else
+        warning "Failed to download eza, skipping..."
+      fi
+    fi
+    ;;
+  esac
+
+  # Install tools not in repos via cargo/binary
+  install_rust_tools
+  install_binary_tools
+
+  success "Modern CLI tools installed"
 }
 
 install_rust_tools() {
-    step "Installing Rust and Rust-based tools"
+  step "Installing Rust and Rust-based tools"
 
-    # Install Rust if not present, or update if already installed
-    if command_exists cargo; then
-        CURRENT_RUST=$(rustc --version 2>/dev/null | awk '{print $2}' || echo "unknown")
-        info "Rust already installed: $CURRENT_RUST"
-        info "Checking for updates..."
-        rustup update stable 2>/dev/null || info "Rust is up to date"
-    else
-        info "Installing Rust..."
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source "$HOME/.cargo/env"
-        success "Rust installed"
-    fi
+  # Install Rust if not present, or update if already installed
+  if command_exists cargo; then
+    CURRENT_RUST=$(rustc --version 2>/dev/null | awk '{print $2}' || echo "unknown")
+    info "Rust already installed: $CURRENT_RUST"
+    info "Checking for updates..."
+    rustup update stable 2>/dev/null || info "Rust is up to date"
+  else
+    info "Installing Rust..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+    success "Rust installed"
+  fi
 
-    # Install Rust tools if not available from system packages
-    if ! command_exists btop && ! command_exists bottom; then
-        info "Installing bottom (btm)..."
-        cargo install bottom || true
-    fi
+  # Install Rust tools if not available from system packages
+  if ! command_exists btop && ! command_exists bottom; then
+    info "Installing bottom (btm)..."
+    cargo install bottom || true
+  fi
 
-    if ! command_exists dust; then
-        info "Installing dust..."
-        cargo install du-dust || true
-    fi
+  if ! command_exists dust; then
+    info "Installing dust..."
+    cargo install du-dust || true
+  fi
 
-    if ! command_exists duf; then
-        # duf is Go-based, we'll install it in binary section
-        true
-    fi
+  if ! command_exists duf; then
+    # duf is Go-based, we'll install it in binary section
+    true
+  fi
 
-    success "Rust tools installation completed"
+  success "Rust tools installation completed"
 }
 
 install_binary_tools() {
-    step "Installing binary tools"
+  step "Installing binary tools"
 
-    mkdir -p ~/.local/bin
+  mkdir -p ~/.local/bin
 
-    # Install duf (Go)
-    DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  # Install duf (Go)
+  DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
-    if [ -z "$DUF_VERSION" ]; then
-        warning "Could not fetch duf version from GitHub API, skipping..."
-    else
-        if command_exists duf; then
-            CURRENT_VERSION=$(duf --version 2>/dev/null | grep -oP 'duf version \K[0-9.]+' || echo "unknown")
-            if [ "$CURRENT_VERSION" = "$DUF_VERSION" ]; then
-                info "duf already at latest version: $CURRENT_VERSION"
-            else
-                info "Updating duf from $CURRENT_VERSION to $DUF_VERSION..."
-                if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
-                    tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
-                    if [ -f /tmp/duf ]; then
-                        mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
-                        chmod +x ~/.local/bin/duf 2>/dev/null || true
-                        success "duf updated to $DUF_VERSION"
-                    fi
-                    rm -f /tmp/duf.tar.gz
-                else
-                    warning "Failed to download duf, skipping..."
-                fi
-            fi
+  if [ -z "$DUF_VERSION" ]; then
+    warning "Could not fetch duf version from GitHub API, skipping..."
+  else
+    if command_exists duf; then
+      CURRENT_VERSION=$(duf --version 2>/dev/null | grep -oP 'duf version \K[0-9.]+' || echo "unknown")
+      if [ "$CURRENT_VERSION" = "$DUF_VERSION" ]; then
+        info "duf already at latest version: $CURRENT_VERSION"
+      else
+        info "Updating duf from $CURRENT_VERSION to $DUF_VERSION..."
+        if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
+          tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
+          if [ -f /tmp/duf ]; then
+            mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
+            chmod +x ~/.local/bin/duf 2>/dev/null || true
+            success "duf updated to $DUF_VERSION"
+          fi
+          rm -f /tmp/duf.tar.gz
         else
-            info "Installing duf..."
-            if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
-                tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
-                if [ -f /tmp/duf ]; then
-                    mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
-                    chmod +x ~/.local/bin/duf 2>/dev/null || true
-                    success "duf installed"
-                fi
-                rm -f /tmp/duf.tar.gz
-            else
-                warning "Failed to download duf, skipping..."
-            fi
+          warning "Failed to download duf, skipping..."
         fi
-    fi
-
-    # Install lazygit
-    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
-
-    if [ -z "$LAZYGIT_VERSION" ]; then
-        warning "Could not fetch lazygit version from GitHub API, skipping..."
+      fi
     else
-        if command_exists lazygit; then
-            CURRENT_VERSION=$(lazygit --version 2>/dev/null | grep -oP 'version=\K[0-9.]+' || echo "unknown")
-            if [ "$CURRENT_VERSION" = "$LAZYGIT_VERSION" ]; then
-                info "lazygit already at latest version: $CURRENT_VERSION"
-            else
-                info "Updating lazygit from $CURRENT_VERSION to $LAZYGIT_VERSION..."
-                if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
-                    tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
-                    if [ -f /tmp/lazygit ]; then
-                        mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
-                        chmod +x ~/.local/bin/lazygit 2>/dev/null || true
-                        success "lazygit updated to $LAZYGIT_VERSION"
-                    fi
-                    rm -f /tmp/lazygit.tar.gz
-                else
-                    warning "Failed to download lazygit, skipping..."
-                fi
-            fi
-        else
-            info "Installing lazygit..."
-            if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
-                tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
-                if [ -f /tmp/lazygit ]; then
-                    mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
-                    chmod +x ~/.local/bin/lazygit 2>/dev/null || true
-                    success "lazygit installed"
-                fi
-                rm -f /tmp/lazygit.tar.gz
-            else
-                warning "Failed to download lazygit, skipping..."
-            fi
+      info "Installing duf..."
+      if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
+        tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
+        if [ -f /tmp/duf ]; then
+          mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
+          chmod +x ~/.local/bin/duf 2>/dev/null || true
+          success "duf installed"
         fi
+        rm -f /tmp/duf.tar.gz
+      else
+        warning "Failed to download duf, skipping..."
+      fi
     fi
+  fi
 
-    success "Binary tools installation completed"
+  # Install lazygit
+  LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+
+  if [ -z "$LAZYGIT_VERSION" ]; then
+    warning "Could not fetch lazygit version from GitHub API, skipping..."
+  else
+    if command_exists lazygit; then
+      CURRENT_VERSION=$(lazygit --version 2>/dev/null | grep -oP 'version=\K[0-9.]+' || echo "unknown")
+      if [ "$CURRENT_VERSION" = "$LAZYGIT_VERSION" ]; then
+        info "lazygit already at latest version: $CURRENT_VERSION"
+      else
+        info "Updating lazygit from $CURRENT_VERSION to $LAZYGIT_VERSION..."
+        if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
+          tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
+          if [ -f /tmp/lazygit ]; then
+            mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
+            chmod +x ~/.local/bin/lazygit 2>/dev/null || true
+            success "lazygit updated to $LAZYGIT_VERSION"
+          fi
+          rm -f /tmp/lazygit.tar.gz
+        else
+          warning "Failed to download lazygit, skipping..."
+        fi
+      fi
+    else
+      info "Installing lazygit..."
+      if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
+        tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
+        if [ -f /tmp/lazygit ]; then
+          mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
+          chmod +x ~/.local/bin/lazygit 2>/dev/null || true
+          success "lazygit installed"
+        fi
+        rm -f /tmp/lazygit.tar.gz
+      else
+        warning "Failed to download lazygit, skipping..."
+      fi
+    fi
+  fi
+
+  success "Binary tools installation completed"
 }
 
 # =============================================================================
@@ -380,17 +388,17 @@ install_binary_tools() {
 # =============================================================================
 
 install_zoxide() {
-    step "Installing zoxide"
+  step "Installing zoxide"
 
-    if command_exists zoxide; then
-        info "zoxide already installed: $(zoxide --version 2>/dev/null || echo 'version unknown')"
-        # The zoxide installer handles updates automatically
-        info "Re-running installer to check for updates..."
-        curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
-    else
-        curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
-        success "zoxide installed"
-    fi
+  if command_exists zoxide; then
+    info "zoxide already installed: $(zoxide --version 2>/dev/null || echo 'version unknown')"
+    # The zoxide installer handles updates automatically
+    info "Re-running installer to check for updates..."
+    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+  else
+    curl -sS https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | bash
+    success "zoxide installed"
+  fi
 }
 
 # =============================================================================
@@ -398,15 +406,15 @@ install_zoxide() {
 # =============================================================================
 
 install_oh_my_posh() {
-    step "Installing oh-my-posh"
+  step "Installing oh-my-posh"
 
-    if command_exists oh-my-posh; then
-        info "oh-my-posh already installed, checking for updates..."
-        oh-my-posh upgrade 2>/dev/null || info "oh-my-posh is up to date"
-    else
-        curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
-        success "oh-my-posh installed"
-    fi
+  if command_exists oh-my-posh; then
+    info "oh-my-posh already installed, checking for updates..."
+    oh-my-posh upgrade 2>/dev/null || info "oh-my-posh is up to date"
+  else
+    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
+    success "oh-my-posh installed"
+  fi
 }
 
 # =============================================================================
@@ -414,23 +422,23 @@ install_oh_my_posh() {
 # =============================================================================
 
 install_sesh() {
-    step "Installing sesh"
+  step "Installing sesh"
 
-    if ! command_exists go; then
-        warning "Go not installed, installing Go first..."
-        install_golang
-    fi
+  if ! command_exists go; then
+    warning "Go not installed, installing Go first..."
+    install_golang
+  fi
 
-    if command_exists sesh; then
-        CURRENT_SESH=$(sesh --version 2>/dev/null | grep -oP 'v\K[0-9.]+' || echo "unknown")
-        info "sesh already installed: v$CURRENT_SESH"
-        info "Updating to latest version..."
-        go install github.com/joshmedeski/sesh@latest 2>/dev/null && success "sesh updated" || info "sesh is up to date"
-    else
-        info "Installing sesh via go install..."
-        go install github.com/joshmedeski/sesh@latest
-        success "sesh installed"
-    fi
+  if command_exists sesh; then
+    CURRENT_SESH=$(sesh --version 2>/dev/null | grep -oP 'v\K[0-9.]+' || echo "unknown")
+    info "sesh already installed: v$CURRENT_SESH"
+    info "Updating to latest version..."
+    go install github.com/joshmedeski/sesh@latest 2>/dev/null && success "sesh updated" || info "sesh is up to date"
+  else
+    info "Installing sesh via go install..."
+    go install github.com/joshmedeski/sesh@latest
+    success "sesh installed"
+  fi
 }
 
 # =============================================================================
@@ -438,28 +446,28 @@ install_sesh() {
 # =============================================================================
 
 install_nvm() {
-    step "Installing NVM"
+  step "Installing NVM"
 
-    if [ -d "$HOME/.nvm" ]; then
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  if [ -d "$HOME/.nvm" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-        if command -v nvm &> /dev/null; then
-            CURRENT_NVM=$(nvm --version 2>/dev/null || echo "unknown")
-            info "NVM already installed: v$CURRENT_NVM"
-            info "To update NVM, run: (cd \$NVM_DIR && git pull)"
-        else
-            info "NVM directory exists but nvm command not available"
-        fi
+    if command -v nvm &>/dev/null; then
+      CURRENT_NVM=$(nvm --version 2>/dev/null || echo "unknown")
+      info "NVM already installed: v$CURRENT_NVM"
+      info "To update NVM, run: (cd \$NVM_DIR && git pull)"
     else
-        # Get latest NVM version
-        LATEST_NVM=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "0.39.7")
-        info "Installing NVM v$LATEST_NVM..."
-        curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/v${LATEST_NVM}/install.sh" | bash
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        success "NVM installed"
+      info "NVM directory exists but nvm command not available"
     fi
+  else
+    # Get latest NVM version
+    LATEST_NVM=$(curl -s https://api.github.com/repos/nvm-sh/nvm/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "0.39.7")
+    info "Installing NVM v$LATEST_NVM..."
+    curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/v${LATEST_NVM}/install.sh" | bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    success "NVM installed"
+  fi
 }
 
 # =============================================================================
@@ -467,76 +475,79 @@ install_nvm() {
 # =============================================================================
 
 install_golang() {
-    step "Installing Golang"
+  step "Installing Golang"
 
-    # Get latest Go version (try multiple methods)
-    GO_VERSION=$(curl -s https://go.dev/VERSION?m=text 2>/dev/null | head -n1)
+  # Get latest Go version (try multiple methods)
+  GO_VERSION=$(curl -s https://go.dev/VERSION?m=text 2>/dev/null | head -n1)
 
-    if [ -z "$GO_VERSION" ]; then
-        # Try alternative method
-        GO_VERSION=$(curl -sL https://golang.org/VERSION?m=text 2>/dev/null | head -n1)
-    fi
+  if [ -z "$GO_VERSION" ]; then
+    # Try alternative method
+    GO_VERSION=$(curl -sL https://golang.org/VERSION?m=text 2>/dev/null | head -n1)
+  fi
 
-    if [ -z "$GO_VERSION" ]; then
-        # Try getting from GitHub API
-        GO_VERSION=$(curl -s https://api.github.com/repos/golang/go/tags 2>/dev/null | grep -m1 '"name":' | grep -oP 'go[0-9.]+' | head -1)
-    fi
+  if [ -z "$GO_VERSION" ]; then
+    # Try getting from GitHub API
+    GO_VERSION=$(curl -s https://api.github.com/repos/golang/go/tags 2>/dev/null | grep -m1 '"name":' | grep -oP 'go[0-9.]+' | head -1)
+  fi
 
-    if [ -z "$GO_VERSION" ]; then
-        error "Could not fetch Go version from any source"
-        warning "Skipping Golang installation. Please install manually from https://go.dev/dl/"
-        return 1
-    fi
+  if [ -z "$GO_VERSION" ]; then
+    error "Could not fetch Go version from any source"
+    warning "Skipping Golang installation. Please install manually from https://go.dev/dl/"
+    return 1
+  fi
 
-    info "Latest Go version: $GO_VERSION"
+  info "Latest Go version: $GO_VERSION"
 
-    if command_exists go; then
-        CURRENT_VERSION=$(go version | awk '{print $3}')
-        if [ "$CURRENT_VERSION" = "$GO_VERSION" ]; then
-            info "Golang already at latest version: $CURRENT_VERSION"
-            return
-        else
-            info "Upgrading Golang from $CURRENT_VERSION to $GO_VERSION"
-        fi
-    fi
-
-    info "Installing $GO_VERSION..."
-
-    # Detect architecture
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)  ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
-        armv7l)  ARCH="armv6l" ;;
-        *)       error "Unsupported architecture: $ARCH"; return 1 ;;
-    esac
-
-    # Download and install
-    DOWNLOAD_URL="https://go.dev/dl/${GO_VERSION}.linux-${ARCH}.tar.gz"
-    info "Downloading from: $DOWNLOAD_URL"
-
-    if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/go.tar.gz; then
-        sudo rm -rf /usr/local/go
-        sudo tar -C /usr/local -xzf /tmp/go.tar.gz
-        rm /tmp/go.tar.gz
+  if command_exists go; then
+    CURRENT_VERSION=$(go version | awk '{print $3}')
+    if [ "$CURRENT_VERSION" = "$GO_VERSION" ]; then
+      info "Golang already at latest version: $CURRENT_VERSION"
+      return
     else
-        error "Failed to download Go from $DOWNLOAD_URL"
-        warning "Please check if the version exists at https://go.dev/dl/"
-        return 1
+      info "Upgrading Golang from $CURRENT_VERSION to $GO_VERSION"
     fi
+  fi
 
-    # Add to PATH in bashrc if not already there
-    if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
-        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-    fi
+  info "Installing $GO_VERSION..."
 
-    if ! grep -q '$HOME/go/bin' ~/.bashrc; then
-        echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
-    fi
+  # Detect architecture
+  ARCH=$(uname -m)
+  case $ARCH in
+  x86_64) ARCH="amd64" ;;
+  aarch64) ARCH="arm64" ;;
+  armv7l) ARCH="armv6l" ;;
+  *)
+    error "Unsupported architecture: $ARCH"
+    return 1
+    ;;
+  esac
 
-    export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+  # Download and install
+  DOWNLOAD_URL="https://go.dev/dl/${GO_VERSION}.linux-${ARCH}.tar.gz"
+  info "Downloading from: $DOWNLOAD_URL"
 
-    success "Golang installed: $GO_VERSION"
+  if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/go.tar.gz; then
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf /tmp/go.tar.gz
+    rm /tmp/go.tar.gz
+  else
+    error "Failed to download Go from $DOWNLOAD_URL"
+    warning "Please check if the version exists at https://go.dev/dl/"
+    return 1
+  fi
+
+  # Add to PATH in bashrc if not already there
+  if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
+    echo 'export PATH=$PATH:/usr/local/go/bin' >>~/.bashrc
+  fi
+
+  if ! grep -q '$HOME/go/bin' ~/.bashrc; then
+    echo 'export PATH=$PATH:$HOME/go/bin' >>~/.bashrc
+  fi
+
+  export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+
+  success "Golang installed: $GO_VERSION"
 }
 
 # =============================================================================
@@ -544,41 +555,41 @@ install_golang() {
 # =============================================================================
 
 install_vcpkg() {
-    step "Installing vcpkg"
+  step "Installing vcpkg"
 
-    if [ -d "$HOME/vcpkg" ]; then
-        info "vcpkg already installed at ~/vcpkg"
-        return
-    fi
+  if [ -d "$HOME/vcpkg" ]; then
+    info "vcpkg already installed at ~/vcpkg"
+    return
+  fi
 
-    # Install prerequisites
-    case "$PKG_MANAGER" in
-        apt)
-            $PKG_INSTALL curl zip unzip tar git
-            ;;
-        pacman)
-            $PKG_INSTALL curl zip unzip tar git
-            ;;
-        dnf|yum)
-            $PKG_INSTALL curl zip unzip tar git
-            ;;
-    esac
+  # Install prerequisites
+  case "$PKG_MANAGER" in
+  apt)
+    $PKG_INSTALL curl zip unzip tar git
+    ;;
+  pacman)
+    $PKG_INSTALL curl zip unzip tar git
+    ;;
+  dnf | yum)
+    $PKG_INSTALL curl zip unzip tar git
+    ;;
+  esac
 
-    info "Cloning vcpkg repository..."
-    git clone https://github.com/microsoft/vcpkg.git "$HOME/vcpkg"
+  info "Cloning vcpkg repository..."
+  git clone https://github.com/microsoft/vcpkg.git "$HOME/vcpkg"
 
-    info "Bootstrapping vcpkg..."
-    "$HOME/vcpkg/bootstrap-vcpkg.sh"
+  info "Bootstrapping vcpkg..."
+  "$HOME/vcpkg/bootstrap-vcpkg.sh"
 
-    # Add to bashrc if not already there
-    if ! grep -q "VCPKG_ROOT" ~/.bashrc; then
-        echo 'export VCPKG_ROOT=~/vcpkg' >> ~/.bashrc
-    fi
+  # Add to bashrc if not already there
+  if ! grep -q "VCPKG_ROOT" ~/.bashrc; then
+    echo 'export VCPKG_ROOT=~/vcpkg' >>~/.bashrc
+  fi
 
-    export VCPKG_ROOT=~/vcpkg
+  export VCPKG_ROOT=~/vcpkg
 
-    success "vcpkg installed at ~/vcpkg"
-    info "Use: vcpkg install <package> to install C++ libraries"
+  success "vcpkg installed at ~/vcpkg"
+  info "Use: vcpkg install <package> to install C++ libraries"
 }
 
 # =============================================================================
@@ -586,112 +597,112 @@ install_vcpkg() {
 # =============================================================================
 
 install_alacritty() {
-    step "Installing Alacritty (from source)"
+  step "Installing Alacritty (from source)"
 
-    if command_exists alacritty; then
-        info "Alacritty already installed"
-        return
-    fi
+  if command_exists alacritty; then
+    info "Alacritty already installed"
+    return
+  fi
 
-    # Install build dependencies
-    info "Installing Alacritty build dependencies..."
-    case "$PKG_MANAGER" in
-        apt)
-            $PKG_INSTALL \
-                cmake \
-                g++ \
-                pkg-config \
-                python3 \
-                libfreetype6-dev \
-                libfontconfig1-dev \
-                libxcb-xfixes0-dev \
-                libxkbcommon-dev \
-                zlib1g-dev \
-                libssl-dev \
-                libx11-dev \
-                libx11-xcb-dev \
-                libxcb-dri3-dev \
-                libxcb-cursor-dev || true
-            ;;
-        pacman)
-            $PKG_INSTALL \
-                cmake \
-                pkgconf \
-                freetype2 \
-                fontconfig \
-                libxcb \
-                libxkbcommon \
-                zlib \
-                openssl \
-                libx11 \
-                xcb-util
-            ;;
-        dnf|yum)
-            $PKG_INSTALL \
-                cmake \
-                pkg-config \
-                freetype-devel \
-                fontconfig-devel \
-                libxcb-devel \
-                libxkbcommon-devel \
-                zlib-devel \
-                openssl-devel \
-                libX11-devel \
-                libX11-xcb-devel \
-                libxcb-devel || true
-            ;;
-    esac
+  # Install build dependencies
+  info "Installing Alacritty build dependencies..."
+  case "$PKG_MANAGER" in
+  apt)
+    $PKG_INSTALL \
+      cmake \
+      g++ \
+      pkg-config \
+      python3 \
+      libfreetype6-dev \
+      libfontconfig1-dev \
+      libxcb-xfixes0-dev \
+      libxkbcommon-dev \
+      zlib1g-dev \
+      libssl-dev \
+      libx11-dev \
+      libx11-xcb-dev \
+      libxcb-dri3-dev \
+      libxcb-cursor-dev || true
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      cmake \
+      pkgconf \
+      freetype2 \
+      fontconfig \
+      libxcb \
+      libxkbcommon \
+      zlib \
+      openssl \
+      libx11 \
+      xcb-util
+    ;;
+  dnf | yum)
+    $PKG_INSTALL \
+      cmake \
+      pkg-config \
+      freetype-devel \
+      fontconfig-devel \
+      libxcb-devel \
+      libxkbcommon-devel \
+      zlib-devel \
+      openssl-devel \
+      libX11-devel \
+      libX11-xcb-devel \
+      libxcb-devel || true
+    ;;
+  esac
 
-    # Ensure Rust is available
-    if ! command_exists cargo; then
-        info "Installing Rust (required for building Alacritty)..."
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-        source "$HOME/.cargo/env"
-    fi
+  # Ensure Rust is available
+  if ! command_exists cargo; then
+    info "Installing Rust (required for building Alacritty)..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+  fi
 
-    # Clone and build Alacritty
-    info "Cloning Alacritty repository..."
-    TMP=$(mktemp -d)
-    cd "$TMP"
+  # Clone and build Alacritty
+  info "Cloning Alacritty repository..."
+  TMP=$(mktemp -d)
+  cd "$TMP"
 
-    if git clone https://github.com/alacritty/alacritty.git; then
-        cd alacritty
+  if git clone https://github.com/alacritty/alacritty.git; then
+    cd alacritty
 
-        info "Building Alacritty (this may take a few minutes)..."
-        if cargo build --release; then
-            # Install binary
-            sudo cp target/release/alacritty /usr/local/bin
-            sudo chmod +x /usr/local/bin/alacritty
+    info "Building Alacritty (this may take a few minutes)..."
+    if cargo build --release; then
+      # Install binary
+      sudo cp target/release/alacritty /usr/local/bin
+      sudo chmod +x /usr/local/bin/alacritty
 
-            # Install desktop entry (optional)
-            if [ ! -f ~/.local/share/applications/Alacritty.desktop ]; then
-                mkdir -p ~/.local/share/applications
-                sudo cp extra/logo/alacritty-term.svg /usr/share/icons/hicolor/scalable/apps/Alacritty.svg 2>/dev/null || true
-                sed -e 's/Icon=alacritty/Icon=Alacritty/g' extra/linux/Alacritty.desktop > ~/.local/share/applications/Alacritty.desktop 2>/dev/null || true
-            fi
+      # Install desktop entry (optional)
+      if [ ! -f ~/.local/share/applications/Alacritty.desktop ]; then
+        mkdir -p ~/.local/share/applications
+        sudo cp extra/logo/alacritty-term.svg /usr/share/icons/hicolor/scalable/apps/Alacritty.svg 2>/dev/null || true
+        sed -e 's/Icon=alacritty/Icon=Alacritty/g' extra/linux/Alacritty.desktop >~/.local/share/applications/Alacritty.desktop 2>/dev/null || true
+      fi
 
-            # Install man page
-            sudo mkdir -p /usr/local/share/man/man1
-            sed -e "s/%VERSION%/$(grep '^version =' Cargo.toml | head -n1 | awk '{print $3}' | tr -d '"')/g" extra/alacritty.man |
-                gzip -c |
-                sudo tee /usr/local/share/man/man1/alacritty.1.gz >/dev/null
+      # Install man page
+      sudo mkdir -p /usr/local/share/man/man1
+      sed -e "s/%VERSION%/$(grep '^version =' Cargo.toml | head -n1 | awk '{print $3}' | tr -d '"')/g" extra/alacritty.man |
+        gzip -c |
+        sudo tee /usr/local/share/man/man1/alacritty.1.gz >/dev/null
 
-            # Install terminfo file for proper terminal functionality
-            info "Installing terminfo entries..."
-            sudo tic -xe alacritty,alacritty-direct extra/alacritty.info
+      # Install terminfo file for proper terminal functionality
+      info "Installing terminfo entries..."
+      sudo tic -xe alacritty,alacritty-direct extra/alacritty.info
 
-            cd / && rm -rf "$TMP"
-            success "Alacritty installed from source"
-        else
-            error "Failed to build Alacritty"
-            cd / && rm -rf "$TMP"
-            return 1
-        fi
+      cd / && rm -rf "$TMP"
+      success "Alacritty installed from source"
     else
-        error "Failed to clone Alacritty repository"
-        cd / && rm -rf "$TMP"
-        return 1
+      error "Failed to build Alacritty"
+      cd / && rm -rf "$TMP"
+      return 1
     fi
+  else
+    error "Failed to clone Alacritty repository"
+    cd / && rm -rf "$TMP"
+    return 1
+  fi
 }
 
 # =============================================================================
@@ -699,60 +710,63 @@ install_alacritty() {
 # =============================================================================
 
 install_nerd_fonts() {
-    step "Installing Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
+  step "Installing Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
 
-    FONT_DIR="$HOME/.local/share/fonts"
+  FONT_DIR="$HOME/.local/share/fonts"
 
-    # Get latest version
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "3.2.1")
+  # Get latest version
+  LATEST_VERSION=$(curl -s https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "3.2.1")
 
-    mkdir -p "$FONT_DIR"
+  mkdir -p "$FONT_DIR"
 
-    # Save current directory
-    PREV_DIR=$(pwd)
-    cd "$FONT_DIR" || { warning "Failed to access font directory"; return 1; }
+  # Save current directory
+  PREV_DIR=$(pwd)
+  cd "$FONT_DIR" || {
+    warning "Failed to access font directory"
+    return 1
+  }
 
-    # Array of fonts to install
-    local fonts=(
-        "FiraCode:FiraCode"
-        "Iosevka:Iosevka"
-        "ProggyClean:ProggyClean"
-        "Lekton:Lekton"
-    )
+  # Array of fonts to install
+  local fonts=(
+    "FiraCode:FiraCode"
+    "Iosevka:Iosevka"
+    "ProggyClean:ProggyClean"
+    "Lekton:Lekton"
+  )
 
-    for font_entry in "${fonts[@]}"; do
-        IFS=':' read -r font_name font_dir <<< "$font_entry"
+  for font_entry in "${fonts[@]}"; do
+    IFS=':' read -r font_name font_dir <<<"$font_entry"
 
-        if fc-list | grep -qi "${font_name}.*Nerd"; then
-            info "${font_name} Nerd Font already installed, skipping..."
-            continue
-        fi
+    if fc-list | grep -qi "${font_name}.*Nerd"; then
+      info "${font_name} Nerd Font already installed, skipping..."
+      continue
+    fi
 
-        info "Downloading ${font_name} Nerd Font v${LATEST_VERSION}..."
-        if wget -q --show-progress "https://github.com/ryanoasis/nerd-fonts/releases/download/v${LATEST_VERSION}/${font_name}.zip" -O "${font_name}.zip" 2>/dev/null; then
-            if [ -f "${font_name}.zip" ]; then
-                unzip -o "${font_name}.zip" -d "${font_dir}" 2>&1 | grep -v "Archive:" || true
-                rm -f "${font_name}.zip"
-                success "${font_name} Nerd Font installed"
-            else
-                warning "${font_name} Nerd Font download incomplete, skipping..."
-            fi
-        else
-            warning "Failed to download ${font_name} Nerd Font, skipping..."
-        fi
-    done
+    info "Downloading ${font_name} Nerd Font v${LATEST_VERSION}..."
+    if wget -q --show-progress "https://github.com/ryanoasis/nerd-fonts/releases/download/v${LATEST_VERSION}/${font_name}.zip" -O "${font_name}.zip" 2>/dev/null; then
+      if [ -f "${font_name}.zip" ]; then
+        unzip -o "${font_name}.zip" -d "${font_dir}" 2>&1 | grep -v "Archive:" || true
+        rm -f "${font_name}.zip"
+        success "${font_name} Nerd Font installed"
+      else
+        warning "${font_name} Nerd Font download incomplete, skipping..."
+      fi
+    else
+      warning "Failed to download ${font_name} Nerd Font, skipping..."
+    fi
+  done
 
-    # Refresh font cache
-    fc-cache -fv >/dev/null 2>&1
+  # Refresh font cache
+  fc-cache -fv >/dev/null 2>&1
 
-    info "Configure your terminal to use any of these fonts:"
-    info "  - FiraCode Nerd Font"
-    info "  - Iosevka Nerd Font (or Iosevka Nerd Font Mono)"
-    info "  - ProggyClean Nerd Font"
-    info "  - Lekton Nerd Font (or Lekton Nerd Font Mono)"
+  info "Configure your terminal to use any of these fonts:"
+  info "  - FiraCode Nerd Font"
+  info "  - Iosevka Nerd Font (or Iosevka Nerd Font Mono)"
+  info "  - ProggyClean Nerd Font"
+  info "  - Lekton Nerd Font (or Lekton Nerd Font Mono)"
 
-    # Return to previous directory
-    cd "$PREV_DIR" || cd "$HOME"
+  # Return to previous directory
+  cd "$PREV_DIR" || cd "$HOME"
 }
 
 # =============================================================================
@@ -760,148 +774,147 @@ install_nerd_fonts() {
 # =============================================================================
 
 install_multimedia_tools() {
-    step "Installing multimedia tools and libraries"
+  step "Installing multimedia tools and libraries"
 
-    case "$PKG_MANAGER" in
-        apt)
-            $PKG_INSTALL \
-                ffmpeg \
-                libavcodec-dev \
-                libavformat-dev \
-                libavutil-dev \
-                libswscale-dev \
-                libswresample-dev \
-                libavfilter-dev \
-                libavdevice-dev \
-                v4l-utils \
-                libv4l-dev \
-                libopus-dev \
-                libvpx-dev \
-                libx264-dev \
-                libx265-dev \
-                libaom-dev \
-                libdav1d-dev \
-                libmp3lame-dev \
-                libvorbis-dev \
-                libtheora-dev \
-                libass-dev \
-                libfreetype6-dev \
-                libfontconfig1-dev \
-                libfribidi-dev \
-                yasm \
-                nasm \
-                libsrtp2-dev \
-                libssl-dev \
-                libwebrtc-audio-processing-dev || true
-            ;;
-        pacman)
-            $PKG_INSTALL \
-                ffmpeg \
-                v4l-utils \
-                opus \
-                libvpx \
-                x264 \
-                x265 \
-                aom \
-                dav1d \
-                lame \
-                libvorbis \
-                libtheora \
-                libass \
-                freetype2 \
-                fontconfig \
-                fribidi \
-                yasm \
-                nasm \
-                libsrtp \
-                openssl \
-                webrtc-audio-processing || true
-            ;;
-        dnf|yum)
-            # Enable RPM Fusion for ffmpeg
-            sudo dnf install -y \
-                https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-                https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm 2>/dev/null || true
+  case "$PKG_MANAGER" in
+  apt)
+    $PKG_INSTALL \
+      ffmpeg \
+      libavcodec-dev \
+      libavformat-dev \
+      libavutil-dev \
+      libswscale-dev \
+      libswresample-dev \
+      libavfilter-dev \
+      libavdevice-dev \
+      v4l-utils \
+      libv4l-dev \
+      libopus-dev \
+      libvpx-dev \
+      libx264-dev \
+      libx265-dev \
+      libaom-dev \
+      libdav1d-dev \
+      libmp3lame-dev \
+      libvorbis-dev \
+      libtheora-dev \
+      libass-dev \
+      libfreetype6-dev \
+      libfontconfig1-dev \
+      libfribidi-dev \
+      yasm \
+      nasm \
+      libsrtp2-dev \
+      libssl-dev \
+      libwebrtc-audio-processing-dev || true
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      ffmpeg \
+      v4l-utils \
+      opus \
+      libvpx \
+      x264 \
+      x265 \
+      aom \
+      dav1d \
+      lame \
+      libvorbis \
+      libtheora \
+      libass \
+      freetype2 \
+      fontconfig \
+      fribidi \
+      yasm \
+      nasm \
+      libsrtp \
+      openssl \
+      webrtc-audio-processing || true
+    ;;
+  dnf | yum)
+    # Enable RPM Fusion for ffmpeg
+    sudo dnf install -y \
+      https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
+      https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm 2>/dev/null || true
 
-            $PKG_INSTALL \
-                ffmpeg \
-                ffmpeg-devel \
-                v4l-utils \
-                opus-devel \
-                libvpx-devel \
-                x264-devel \
-                x265-devel \
-                lame-devel \
-                libvorbis-devel \
-                libtheora-devel \
-                libass-devel \
-                freetype-devel \
-                fontconfig-devel \
-                fribidi-devel \
-                yasm \
-                nasm \
-                libsrtp-devel \
-                openssl-devel || true
-            ;;
-    esac
+    $PKG_INSTALL \
+      ffmpeg \
+      ffmpeg-devel \
+      v4l-utils \
+      opus-devel \
+      libvpx-devel \
+      x264-devel \
+      x265-devel \
+      lame-devel \
+      libvorbis-devel \
+      libtheora-devel \
+      libass-devel \
+      freetype-devel \
+      fontconfig-devel \
+      fribidi-devel \
+      yasm \
+      nasm \
+      libsrtp-devel \
+      openssl-devel || true
+    ;;
+  esac
 
-    success "Multimedia tools installed"
+  success "Multimedia tools installed"
 }
 
 command_exists() {
-    command -v "$1" >/dev/null 2>&1
+  command -v "$1" >/dev/null 2>&1
 }
 
 append_if_missing() {
-    local line="$1"
-    local file="$2"
-    grep -qxF "$line" "$file" 2>/dev/null || echo "$line" | sudo tee -a "$file"
+  local line="$1"
+  local file="$2"
+  grep -qxF "$line" "$file" 2>/dev/null || echo "$line" | sudo tee -a "$file"
 }
-
 
 # =============================================================================
 # Install C++23 Build Tools
 # =============================================================================
 
 install_cpp_build_tools() {
-    step "Installing C++23 build tools"
+  step "Installing C++23 build tools"
 
-    case "$PKG_MANAGER" in
-        apt)
-	     set -e
+  case "$PKG_MANAGER" in
+  apt)
+    set -e
 
     echo "[*] Installing base build tools (distro only)"
     sudo apt update
     sudo apt install -y \
-        build-essential \
-        gcc \
-        g++ \
-        clang \
-        clang-format \
-        clang-tidy \
-        lldb \
-        lld \
-        cmake \
-        ninja-build \
-        ccache \
-        meson \
-        autoconf \
-        automake \
-        libtool \
-        pkg-config \
-        libboost-all-dev \
-        libeigen3-dev \
-        libfmt-dev \
-        libspdlog-dev \
-        catch2 \
-        libgtest-dev \
-        libgmock-dev \
-        libbenchmark-dev \
-        valgrind \
-        gdb \
-        wget \
-        xz-utils \
-        ca-certificates
+      build-essential \
+      gcc \
+      g++ \
+      clang \
+      clang-format \
+      clang-tidy \
+      lldb \
+      lld \
+      cmake \
+      ninja-build \
+      ccache \
+      meson \
+      autoconf \
+      automake \
+      libtool \
+      pkg-config \
+      libboost-all-dev \
+      libeigen3-dev \
+      libfmt-dev \
+      libspdlog-dev \
+      catch2 \
+      libgtest-dev \
+      libgmock-dev \
+      libbenchmark-dev \
+      valgrind \
+      gdb \
+      wget \
+      xz-utils \
+      ca-certificates
 
     ############################################
     # LLVM 18 (official binaries → /opt)
@@ -910,18 +923,18 @@ install_cpp_build_tools() {
     LLVM_DIR="/opt/llvm-18"
 
     if [ ! -d "$LLVM_DIR" ]; then
-        echo "[*] Installing LLVM ${LLVM_VERSION}"
-        TMP=$(mktemp -d)
-        cd "$TMP"
+      echo "[*] Installing LLVM ${LLVM_VERSION}"
+      TMP=$(mktemp -d)
+      cd "$TMP"
 
-        wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
-        sudo tar -C /opt -xf clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
-        sudo mv /opt/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04 "$LLVM_DIR"
+      wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+      sudo tar -C /opt -xf clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
+      sudo mv /opt/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04 "$LLVM_DIR"
 
-        cd /
-        rm -rf "$TMP"
+      cd /
+      rm -rf "$TMP"
     else
-        echo "[*] LLVM 18 already installed"
+      echo "[*] LLVM 18 already installed"
     fi
 
     ############################################
@@ -931,33 +944,33 @@ install_cpp_build_tools() {
     GCC_DIR="/opt/gcc-14"
 
     if [ ! -d "$GCC_DIR" ]; then
-        echo "[*] Building GCC ${GCC_VERSION} (this takes time)"
-        sudo apt install -y \
-            libgmp-dev \
-            libmpfr-dev \
-            libmpc-dev \
-            flex \
-            bison
+      echo "[*] Building GCC ${GCC_VERSION} (this takes time)"
+      sudo apt install -y \
+        libgmp-dev \
+        libmpfr-dev \
+        libmpc-dev \
+        flex \
+        bison
 
-        TMP=$(mktemp -d)
-        cd "$TMP"
+      TMP=$(mktemp -d)
+      cd "$TMP"
 
-        wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
-        tar xf gcc-${GCC_VERSION}.tar.xz
-        cd gcc-${GCC_VERSION}
+      wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
+      tar xf gcc-${GCC_VERSION}.tar.xz
+      cd gcc-${GCC_VERSION}
 
-        ./configure \
-            --prefix="$GCC_DIR" \
-            --disable-multilib \
-            --enable-languages=c,c++
+      ./configure \
+        --prefix="$GCC_DIR" \
+        --disable-multilib \
+        --enable-languages=c,c++
 
-        make -j"$(nproc)"
-        sudo make install
+      make -j"$(nproc)"
+      sudo make install
 
-        cd /
-        rm -rf "$TMP"
+      cd /
+      rm -rf "$TMP"
     else
-        echo "[*] GCC 14 already installed"
+      echo "[*] GCC 14 already installed"
     fi
 
     ############################################
@@ -973,64 +986,64 @@ install_cpp_build_tools() {
 
     sudo chmod 644 "$ENV_FILE"
 
-    echo "[✓] Toolchain setup complete"	
+    echo "[✓] Toolchain setup complete"
 
-          ;;
-        pacman)
-            $PKG_INSTALL \
-                base-devel \
-                gcc \
-                clang \
-                llvm \
-                lld \
-                lldb \
-                libc++ \
-                cmake \
-                ninja \
-                ccache \
-                meson \
-                autoconf \
-                automake \
-                libtool \
-                pkgconf \
-                boost \
-                eigen \
-                fmt \
-                spdlog \
-                catch2 \
-                gtest \
-                benchmark \
-                valgrind \
-                gdb || true
-            ;;
-        dnf|yum)
-            $PKG_INSTALL \
-                gcc \
-                gcc-c++ \
-                clang \
-                llvm \
-                lld \
-                lldb \
-                libcxx-devel \
-                cmake \
-                ninja-build \
-                ccache \
-                meson \
-                autoconf \
-                automake \
-                libtool \
-                pkgconfig \
-                boost-devel \
-                eigen3-devel \
-                fmt-devel \
-                spdlog-devel \
-                gtest-devel \
-                valgrind \
-                gdb || true
-            ;;
-    esac
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      base-devel \
+      gcc \
+      clang \
+      llvm \
+      lld \
+      lldb \
+      libc++ \
+      cmake \
+      ninja \
+      ccache \
+      meson \
+      autoconf \
+      automake \
+      libtool \
+      pkgconf \
+      boost \
+      eigen \
+      fmt \
+      spdlog \
+      catch2 \
+      gtest \
+      benchmark \
+      valgrind \
+      gdb || true
+    ;;
+  dnf | yum)
+    $PKG_INSTALL \
+      gcc \
+      gcc-c++ \
+      clang \
+      llvm \
+      lld \
+      lldb \
+      libcxx-devel \
+      cmake \
+      ninja-build \
+      ccache \
+      meson \
+      autoconf \
+      automake \
+      libtool \
+      pkgconfig \
+      boost-devel \
+      eigen3-devel \
+      fmt-devel \
+      spdlog-devel \
+      gtest-devel \
+      valgrind \
+      gdb || true
+    ;;
+  esac
 
-    success "C++23 build tools installed"
+  success "C++23 build tools installed"
 }
 
 # =============================================================================
@@ -1038,105 +1051,105 @@ install_cpp_build_tools() {
 # =============================================================================
 
 install_python_dev_tools() {
-    step "Installing Python development tools"
+  step "Installing Python development tools"
 
-    case "$PKG_MANAGER" in
-        apt)
-            # Install essential packages first
-            $PKG_INSTALL \
-                python3 \
-                python3-pip \
-                python3-dev \
-                python3-venv \
-                python3-full \
-                python3-setuptools \
-                python3-wheel \
-                python-is-python3 \
-                libpython3-dev 2>/dev/null || true
+  case "$PKG_MANAGER" in
+  apt)
+    # Install essential packages first
+    $PKG_INSTALL \
+      python3 \
+      python3-pip \
+      python3-dev \
+      python3-venv \
+      python3-full \
+      python3-setuptools \
+      python3-wheel \
+      python-is-python3 \
+      libpython3-dev 2>/dev/null || true
 
-            # Try to install optional packages individually (some may not exist in newer Ubuntu)
-            local optional_packages=(
-                "ipython3"
-                "python3-pytest"
-                "python3-pytest-cov"
-                "python3-black"
-                "python3-flake8"
-                "python3-mypy"
-                "python3-pylint"
-                "python3-autopep8"
-                "python3-rope"
-                "python3-jedi"
-                "cython3"
-                "pipx"
-            )
+    # Try to install optional packages individually (some may not exist in newer Ubuntu)
+    local optional_packages=(
+      "ipython3"
+      "python3-pytest"
+      "python3-pytest-cov"
+      "python3-black"
+      "python3-flake8"
+      "python3-mypy"
+      "python3-pylint"
+      "python3-autopep8"
+      "python3-rope"
+      "python3-jedi"
+      "cython3"
+      "pipx"
+    )
 
-            for pkg in "${optional_packages[@]}"; do
-                $PKG_INSTALL "$pkg" 2>/dev/null || info "Package $pkg not available, will install via pip/pipx"
-            done
-            ;;
-        pacman)
-            $PKG_INSTALL \
-                python \
-                python-pip \
-                python-virtualenv \
-                python-setuptools \
-                python-wheel \
-                ipython \
-                python-pytest \
-                python-pytest-cov \
-                python-black \
-                flake8 \
-                mypy \
-                python-pylint \
-                autopep8 \
-                python-rope \
-                python-jedi \
-                cython \
-                python-pipx || true
-            ;;
-        dnf|yum)
-            $PKG_INSTALL \
-                python3 \
-                python3-pip \
-                python3-devel \
-                python3-virtualenv \
-                python3-setuptools \
-                python3-wheel \
-                ipython \
-                python3-pytest \
-                python3-black \
-                python3-flake8 \
-                python3-mypy \
-                pylint \
-                python3-autopep8 \
-                python3-rope \
-                python3-jedi \
-                Cython \
-                pipx || true
-            ;;
-    esac
+    for pkg in "${optional_packages[@]}"; do
+      $PKG_INSTALL "$pkg" 2>/dev/null || info "Package $pkg not available, will install via pip/pipx"
+    done
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      python \
+      python-pip \
+      python-virtualenv \
+      python-setuptools \
+      python-wheel \
+      ipython \
+      python-pytest \
+      python-pytest-cov \
+      python-black \
+      flake8 \
+      mypy \
+      python-pylint \
+      autopep8 \
+      python-rope \
+      python-jedi \
+      cython \
+      python-pipx || true
+    ;;
+  dnf | yum)
+    $PKG_INSTALL \
+      python3 \
+      python3-pip \
+      python3-devel \
+      python3-virtualenv \
+      python3-setuptools \
+      python3-wheel \
+      ipython \
+      python3-pytest \
+      python3-black \
+      python3-flake8 \
+      python3-mypy \
+      pylint \
+      python3-autopep8 \
+      python3-rope \
+      python3-jedi \
+      Cython \
+      pipx || true
+    ;;
+  esac
 
-    # Install pipx for isolated tool installation
-    if ! command_exists pipx; then
-        info "Installing pipx..."
-        # Use --break-system-packages for user installs (safe since it's isolated to user)
-        python3 -m pip install --user --break-system-packages pipx 2>/dev/null || {
-            warning "Failed to install pipx via pip"
-        }
-        # Ensure pipx is in PATH
-        export PATH="$HOME/.local/bin:$PATH"
-        if command_exists pipx; then
-            python3 -m pipx ensurepath 2>/dev/null || true
-        fi
+  # Install pipx for isolated tool installation
+  if ! command_exists pipx; then
+    info "Installing pipx..."
+    # Use --break-system-packages for user installs (safe since it's isolated to user)
+    python3 -m pip install --user --break-system-packages pipx 2>/dev/null || {
+      warning "Failed to install pipx via pip"
+    }
+    # Ensure pipx is in PATH
+    export PATH="$HOME/.local/bin:$PATH"
+    if command_exists pipx; then
+      python3 -m pipx ensurepath 2>/dev/null || true
     fi
+  fi
 
-    # Install pyenv for Python version management
-    if [ ! -d "$HOME/.pyenv" ]; then
-        info "Installing pyenv..."
-        if curl -s https://pyenv.run 2>/dev/null | bash 2>/dev/null; then
-            # Add to bashrc if not present
-            if ! grep -q 'pyenv init' ~/.bashrc; then
-                cat >> ~/.bashrc << 'EOF'
+  # Install pyenv for Python version management
+  if [ ! -d "$HOME/.pyenv" ]; then
+    info "Installing pyenv..."
+    if curl -s https://pyenv.run 2>/dev/null | bash 2>/dev/null; then
+      # Add to bashrc if not present
+      if ! grep -q 'pyenv init' ~/.bashrc; then
+        cat >>~/.bashrc <<'EOF'
 
 # Pyenv
 export PYENV_ROOT="$HOME/.pyenv"
@@ -1144,66 +1157,66 @@ export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 EOF
-            fi
-        else
-            warning "Failed to install pyenv, skipping..."
-        fi
-    fi
-
-    # Install poetry for dependency management
-    if ! command_exists poetry; then
-        info "Installing poetry..."
-        if curl -sSL https://install.python-poetry.org 2>/dev/null | python3 - 2>/dev/null; then
-            export PATH="$HOME/.local/bin:$PATH"
-            success "poetry installed"
-        else
-            warning "Failed to install poetry, skipping..."
-        fi
-    fi
-
-    # Install common Python dev tools via pipx (preferred) or pip
-    if command_exists pipx; then
-        info "Installing Python tools via pipx..."
-        local pipx_tools=(
-            "black"
-            "ruff"
-            "isort"
-            "mypy"
-            "pylint"
-            "flake8"
-            "pytest"
-            "ipython"
-        )
-
-        for tool in "${pipx_tools[@]}"; do
-            if ! command_exists "$tool"; then
-                pipx install "$tool" 2>/dev/null || info "$tool installation skipped"
-            fi
-        done
+      fi
     else
-        info "Installing Python tools via pip (--user)..."
-        # Use --break-system-packages with --user flag (safe for user installs)
-        python3 -m pip install --user --break-system-packages --upgrade \
-            pip \
-            setuptools \
-            wheel \
-            virtualenv \
-            black \
-            ruff \
-            isort \
-            mypy \
-            pylint \
-            flake8 \
-            pytest \
-            pytest-cov \
-            ipython \
-            jupyterlab \
-            numpy \
-            pandas \
-            requests 2>/dev/null || warning "Some Python packages failed to install"
+      warning "Failed to install pyenv, skipping..."
     fi
+  fi
 
-    success "Python development tools installation completed"
+  # Install poetry for dependency management
+  if ! command_exists poetry; then
+    info "Installing poetry..."
+    if curl -sSL https://install.python-poetry.org 2>/dev/null | python3 - 2>/dev/null; then
+      export PATH="$HOME/.local/bin:$PATH"
+      success "poetry installed"
+    else
+      warning "Failed to install poetry, skipping..."
+    fi
+  fi
+
+  # Install common Python dev tools via pipx (preferred) or pip
+  if command_exists pipx; then
+    info "Installing Python tools via pipx..."
+    local pipx_tools=(
+      "black"
+      "ruff"
+      "isort"
+      "mypy"
+      "pylint"
+      "flake8"
+      "pytest"
+      "ipython"
+    )
+
+    for tool in "${pipx_tools[@]}"; do
+      if ! command_exists "$tool"; then
+        pipx install "$tool" 2>/dev/null || info "$tool installation skipped"
+      fi
+    done
+  else
+    info "Installing Python tools via pip (--user)..."
+    # Use --break-system-packages with --user flag (safe for user installs)
+    python3 -m pip install --user --break-system-packages --upgrade \
+      pip \
+      setuptools \
+      wheel \
+      virtualenv \
+      black \
+      ruff \
+      isort \
+      mypy \
+      pylint \
+      flake8 \
+      pytest \
+      pytest-cov \
+      ipython \
+      jupyterlab \
+      numpy \
+      pandas \
+      requests 2>/dev/null || warning "Some Python packages failed to install"
+  fi
+
+  success "Python development tools installation completed"
 }
 
 # =============================================================================
@@ -1211,45 +1224,45 @@ EOF
 # =============================================================================
 
 install_rust_utilities() {
-    step "Installing additional Rust utilities"
+  step "Installing additional Rust utilities"
 
-    # Ensure Rust is installed
-    if ! command_exists cargo; then
-        install_rust_tools
+  # Ensure Rust is installed
+  if ! command_exists cargo; then
+    install_rust_tools
+  fi
+
+  # Source cargo env to ensure it's in PATH
+  [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+
+  # Install useful Rust CLI tools one by one to avoid termination on failure
+  info "Installing Rust utilities (this may take a while)..."
+
+  local rust_tools=(
+    "cargo-edit"
+    "cargo-watch"
+    "cargo-audit"
+    "cargo-outdated"
+    "cargo-tree"
+    "cargo-expand"
+    "cargo-bloat"
+    "tokei"
+    "hyperfine"
+    "sd"
+    "procs"
+    "grex"
+    "zellij"
+  )
+
+  for tool in "${rust_tools[@]}"; do
+    if ! command_exists "$tool"; then
+      info "Installing $tool..."
+      cargo install "$tool" 2>/dev/null || warning "Failed to install $tool (skipping)"
+    else
+      info "$tool already installed"
     fi
+  done
 
-    # Source cargo env to ensure it's in PATH
-    [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
-
-    # Install useful Rust CLI tools one by one to avoid termination on failure
-    info "Installing Rust utilities (this may take a while)..."
-
-    local rust_tools=(
-        "cargo-edit"
-        "cargo-watch"
-        "cargo-audit"
-        "cargo-outdated"
-        "cargo-tree"
-        "cargo-expand"
-        "cargo-bloat"
-        "tokei"
-        "hyperfine"
-        "sd"
-        "procs"
-        "grex"
-        "zellij"
-    )
-
-    for tool in "${rust_tools[@]}"; do
-        if ! command_exists "$tool"; then
-            info "Installing $tool..."
-            cargo install "$tool" 2>/dev/null || warning "Failed to install $tool (skipping)"
-        else
-            info "$tool already installed"
-        fi
-    done
-
-    success "Rust utilities installation completed"
+  success "Rust utilities installation completed"
 }
 
 # =============================================================================
@@ -1257,118 +1270,118 @@ install_rust_utilities() {
 # =============================================================================
 
 build_neovim_from_source() {
-    step "Building Neovim from source"
+  step "Building Neovim from source"
 
-    # Check if nvim is already installed and up-to-date
-    if command_exists nvim; then
-        CURRENT_COMMIT=$(nvim --version | head -1 | grep -oP 'NVIM v[0-9.]+-dev-\K[0-9]+' || echo "")
+  # Check if nvim is already installed and up-to-date
+  if command_exists nvim; then
+    CURRENT_COMMIT=$(nvim --version | head -1 | grep -oP 'NVIM v[0-9.]+-dev-\K[0-9]+' || echo "")
 
-        # Fetch latest stable commit without cloning
-        LATEST_COMMIT=$(git ls-remote https://github.com/neovim/neovim refs/heads/stable | cut -f1 | cut -c1-7)
+    # Fetch latest stable commit without cloning
+    LATEST_COMMIT=$(git ls-remote https://github.com/neovim/neovim refs/heads/stable | cut -f1 | cut -c1-7)
 
-        if [ -n "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
-            info "Current Neovim commit: $CURRENT_COMMIT, Latest stable: $LATEST_COMMIT"
-            # For stable releases, just check if nvim exists with recent version
-            CURRENT_VERSION=$(nvim --version | head -1 | grep -oP 'NVIM v\K[0-9.]+' || echo "0.0.0")
-            info "Neovim already installed: v$CURRENT_VERSION"
+    if [ -n "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
+      info "Current Neovim commit: $CURRENT_COMMIT, Latest stable: $LATEST_COMMIT"
+      # For stable releases, just check if nvim exists with recent version
+      CURRENT_VERSION=$(nvim --version | head -1 | grep -oP 'NVIM v\K[0-9.]+' || echo "0.0.0")
+      info "Neovim already installed: v$CURRENT_VERSION"
 
-            read -p "Rebuild Neovim from latest stable? (y/N): " rebuild
-            if [[ ! "$rebuild" =~ ^[Yy]$ ]]; then
-                info "Skipping Neovim build"
-                return
-            fi
-        fi
+      read -p "Rebuild Neovim from latest stable? (y/N): " rebuild
+      if [[ ! "$rebuild" =~ ^[Yy]$ ]]; then
+        info "Skipping Neovim build"
+        return
+      fi
     fi
+  fi
 
-    # Install build dependencies
-    info "Installing Neovim build dependencies..."
+  # Install build dependencies
+  info "Installing Neovim build dependencies..."
 
-    case "$PKG_MANAGER" in
-        apt)
-            $PKG_INSTALL \
-                ninja-build \
-                gettext \
-                cmake \
-                unzip \
-                curl \
-                build-essential \
-                libtool \
-                libtool-bin \
-                autoconf \
-                automake \
-                cmake \
-                g++ \
-                pkg-config \
-                doxygen \
-                libluajit-5.1-dev \
-                libunibilium-dev \
-                libmsgpack-dev \
-                libtermkey-dev \
-                libvterm-dev \
-                libutf8proc-dev \
-                luajit \
-                lua5.1 \
-                liblua5.1-dev || true
-            ;;
-        pacman)
-            $PKG_INSTALL \
-                base-devel \
-                cmake \
-                unzip \
-                ninja \
-                curl \
-                tree-sitter \
-                libtool \
-                autoconf \
-                automake \
-                pkg-config \
-                gettext \
-                luajit \
-                msgpack-c \
-                libtermkey \
-                libvterm \
-                utf8proc || true
-            ;;
-        dnf|yum)
-            $PKG_INSTALL \
-                ninja-build \
-                cmake \
-                gcc \
-                gcc-c++ \
-                make \
-                unzip \
-                gettext \
-                curl \
-                autoconf \
-                automake \
-                libtool \
-                pkgconfig \
-                msgpack-devel \
-                libtermkey-devel \
-                libvterm-devel \
-                utf8proc-devel \
-                luajit-devel || true
-            ;;
-    esac
+  case "$PKG_MANAGER" in
+  apt)
+    $PKG_INSTALL \
+      ninja-build \
+      gettext \
+      cmake \
+      unzip \
+      curl \
+      build-essential \
+      libtool \
+      libtool-bin \
+      autoconf \
+      automake \
+      cmake \
+      g++ \
+      pkg-config \
+      doxygen \
+      libluajit-5.1-dev \
+      libunibilium-dev \
+      libmsgpack-dev \
+      libtermkey-dev \
+      libvterm-dev \
+      libutf8proc-dev \
+      luajit \
+      lua5.1 \
+      liblua5.1-dev || true
+    ;;
+  pacman)
+    $PKG_INSTALL \
+      base-devel \
+      cmake \
+      unzip \
+      ninja \
+      curl \
+      tree-sitter \
+      libtool \
+      autoconf \
+      automake \
+      pkg-config \
+      gettext \
+      luajit \
+      msgpack-c \
+      libtermkey \
+      libvterm \
+      utf8proc || true
+    ;;
+  dnf | yum)
+    $PKG_INSTALL \
+      ninja-build \
+      cmake \
+      gcc \
+      gcc-c++ \
+      make \
+      unzip \
+      gettext \
+      curl \
+      autoconf \
+      automake \
+      libtool \
+      pkgconfig \
+      msgpack-devel \
+      libtermkey-devel \
+      libvterm-devel \
+      utf8proc-devel \
+      luajit-devel || true
+    ;;
+  esac
 
-    # Clone and build Neovim
-    info "Cloning Neovim repository..."
-    NVIM_BUILD_DIR="/tmp/neovim-build-$$"
-    git clone https://github.com/neovim/neovim "$NVIM_BUILD_DIR"
-    cd "$NVIM_BUILD_DIR"
+  # Clone and build Neovim
+  info "Cloning Neovim repository..."
+  NVIM_BUILD_DIR="/tmp/neovim-build-$$"
+  git clone https://github.com/neovim/neovim "$NVIM_BUILD_DIR"
+  cd "$NVIM_BUILD_DIR"
 
-    # Checkout stable version
-    git checkout stable
+  # Checkout stable version
+  git checkout stable
 
-    info "Building Neovim (this will take several minutes)..."
-    make CMAKE_BUILD_TYPE=RelWithDebInfo
-    cd build && cpack -G DEB && sudo dpkg -i nvim-linux-x86_64.deb
+  info "Building Neovim (this will take several minutes)..."
+  make CMAKE_BUILD_TYPE=RelWithDebInfo
+  cd build && cpack -G DEB && sudo dpkg -i nvim-linux-x86_64.deb
 
-    # Cleanup
-    cd - > /dev/null
-    rm -rf "$NVIM_BUILD_DIR"
+  # Cleanup
+  cd - >/dev/null
+  rm -rf "$NVIM_BUILD_DIR"
 
-    success "Neovim built and installed to ~/.local/bin/nvim"
+  success "Neovim built and installed to ~/.local/bin/nvim"
 }
 
 # =============================================================================
@@ -1376,58 +1389,57 @@ build_neovim_from_source() {
 # =============================================================================
 
 setup_astronvim() {
-    step "Setting up AstroNvim"
+  step "Setting up AstroNvim"
 
-    # Install AstroNvim dependencies
-    info "Installing AstroNvim dependencies..."
+  # Install AstroNvim dependencies
+  info "Installing AstroNvim dependencies..."
 
-    # Tree-sitter CLI
-    if ! command_exists tree-sitter; then
-        case "$PKG_MANAGER" in
-            apt)
-                $PKG_INSTALL libtree-sitter-dev || cargo install tree-sitter-cli
-                ;;
-            pacman)
-                $PKG_INSTALL tree-sitter tree-sitter-cli
-                ;;
-            dnf|yum)
-                cargo install tree-sitter-cli
-                ;;
-        esac
-    fi
+  # Tree-sitter CLI
+  if ! command_exists tree-sitter; then
+    case "$PKG_MANAGER" in
+    apt)
+      $PKG_INSTALL libtree-sitter-dev || cargo install tree-sitter-cli
+      ;;
+    pacman)
+      $PKG_INSTALL tree-sitter tree-sitter-cli
+      ;;
+    dnf | yum)
+      cargo install tree-sitter-cli
+      ;;
+    esac
+  fi
 
+  info "Backing up the nvim config"
+  # Ensure we're in a safe directory
+  cd "$HOME" || cd /tmp
 
-    info "Backing up the nvim config"
-    # Ensure we're in a safe directory
-    cd "$HOME" || cd /tmp
+  # Backup existing nvim config
+  if [ -d ~/.config/nvim ]; then
+    info "Backing up existing nvim config..."
+    mv ~/.config/nvim ~/.config/nvim.backup.$(date +%Y%m%d-%H%M%S)
+  fi
 
-    # Backup existing nvim config
-    if [ -d ~/.config/nvim ]; then
-        info "Backing up existing nvim config..."
-        mv ~/.config/nvim ~/.config/nvim.backup.$(date +%Y%m%d-%H%M%S)
-    fi
+  if [ -d ~/.local/share/nvim ]; then
+    mv ~/.local/share/nvim ~/.local/share/nvim.backup.$(date +%Y%m%d-%H%M%S)
+  fi
 
-    if [ -d ~/.local/share/nvim ]; then
-        mv ~/.local/share/nvim ~/.local/share/nvim.backup.$(date +%Y%m%d-%H%M%S)
-    fi
+  if [ -d ~/.local/state/nvim ]; then
+    mv ~/.local/state/nvim ~/.local/state/nvim.backup.$(date +%Y%m%d-%H%M%S)
+  fi
 
-    if [ -d ~/.local/state/nvim ]; then
-        mv ~/.local/state/nvim ~/.local/state/nvim.backup.$(date +%Y%m%d-%H%M%S)
-    fi
+  if [ -d ~/.cache/nvim ]; then
+    mv ~/.cache/nvim ~/.cache/nvim.backup.$(date +%Y%m%d-%H%M%S)
+  fi
 
-    if [ -d ~/.cache/nvim ]; then
-        mv ~/.cache/nvim ~/.cache/nvim.backup.$(date +%Y%m%d-%H%M%S)
-    fi
+  # Clone AstroNvim
+  info "Cloning AstroNvim..."
+  git clone --depth 1 https://github.com/AstroNvim/template ~/.config/nvim
 
-    # Clone AstroNvim
-    info "Cloning AstroNvim..."
-    git clone --depth 1 https://github.com/AstroNvim/template ~/.config/nvim
+  # Remove .git folder for clean start
+  rm -rf ~/.config/nvim/.git
 
-    # Remove .git folder for clean start
-    rm -rf ~/.config/nvim/.git
-
-    success "AstroNvim installed!"
-    info "Run 'nvim' to complete the setup (plugins will auto-install)"
+  success "AstroNvim installed!"
+  info "Run 'nvim' to complete the setup (plugins will auto-install)"
 }
 
 # =============================================================================
@@ -1435,28 +1447,28 @@ setup_astronvim() {
 # =============================================================================
 
 install_docker() {
-    step "Installing Docker"
+  step "Installing Docker"
 
-    if command_exists docker; then
-        info "Docker already installed"
-        return
-    fi
+  if command_exists docker; then
+    info "Docker already installed"
+    return
+  fi
 
-    case "$PKG_MANAGER" in
-        apt)
-            # Remove old versions
-	    sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
+  case "$PKG_MANAGER" in
+  apt)
+    # Remove old versions
+    sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
 
-            # Install Docker
-	    # Add Docker's official GPG key:
-sudo apt update
-sudo apt install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+    # Install Docker
+    # Add Docker's official GPG key:
+    sudo apt update
+    sudo apt install ca-certificates curl
+    sudo install -m 0755 -d /etc/apt/keyrings
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
 
-# Add the repository to Apt sources:
-sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+    # Add the repository to Apt sources:
+    sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
 Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
@@ -1464,34 +1476,34 @@ Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
-sudo apt update
+    sudo apt update
 
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-            # Enable and start Docker
-            sudo systemctl enable docker
-            sudo systemctl start docker
+    sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    # Enable and start Docker
+    sudo systemctl enable docker
+    sudo systemctl start docker
 
-            # Add user to docker group
-            sudo usermod -aG docker "$USER"
-            ;;
-        pacman)
-            $PKG_INSTALL docker docker-compose
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            sudo usermod -aG docker "$USER"
-            ;;
-        dnf|yum)
-            $PKG_INSTALL dnf-plugins-core
-            sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo || \
-            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
-            $PKG_INSTALL docker-ce docker-ce-cli containerd.io docker-compose-plugin
-            sudo systemctl enable docker
-            sudo systemctl start docker
-            sudo usermod -aG docker "$USER"
-            ;;
-    esac
+    # Add user to docker group
+    sudo usermod -aG docker "$USER"
+    ;;
+  pacman)
+    $PKG_INSTALL docker docker-compose
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    sudo usermod -aG docker "$USER"
+    ;;
+  dnf | yum)
+    $PKG_INSTALL dnf-plugins-core
+    sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo ||
+      sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    $PKG_INSTALL docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    sudo usermod -aG docker "$USER"
+    ;;
+  esac
 
-    success "Docker installed (you may need to logout/login for group changes)"
+  success "Docker installed (you may need to logout/login for group changes)"
 }
 
 # =============================================================================
@@ -1499,140 +1511,158 @@ sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin dock
 # =============================================================================
 
 install_kubernetes_tools() {
-    step "Installing Kubernetes tools (kubectl, helm, minikube, kind)"
+  step "Installing Kubernetes tools (kubectl, helm, minikube, kind)"
 
-    # Install kubectl
-    KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt 2>/dev/null || echo "")
+  # Install kubectl
+  KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt 2>/dev/null || echo "")
 
-    if [ -z "$KUBECTL_VERSION" ]; then
-        warning "Could not fetch kubectl version, skipping..."
+  if [ -z "$KUBECTL_VERSION" ]; then
+    warning "Could not fetch kubectl version, skipping..."
+  else
+    if command_exists kubectl; then
+      CURRENT_VERSION="v$(kubectl version --client -o json 2>/dev/null | grep -oP '"gitVersion":\s*"\K[^"]+' || echo "unknown")"
+      if [ "$CURRENT_VERSION" = "$KUBECTL_VERSION" ]; then
+        info "kubectl already at latest version: $CURRENT_VERSION"
+      else
+        info "Updating kubectl from $CURRENT_VERSION to $KUBECTL_VERSION..."
+        if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
+          chmod +x kubectl 2>/dev/null || true
+          mv kubectl ~/.local/bin/ 2>/dev/null || {
+            warning "Failed to update kubectl"
+            rm -f kubectl
+          }
+          success "kubectl updated to $KUBECTL_VERSION"
+        else
+          warning "Failed to download kubectl, skipping..."
+        fi
+      fi
     else
+      info "Installing kubectl..."
+      if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
+        chmod +x kubectl 2>/dev/null || true
+        mv kubectl ~/.local/bin/ 2>/dev/null || {
+          warning "Failed to install kubectl"
+          rm -f kubectl
+        }
         if command_exists kubectl; then
-            CURRENT_VERSION="v$(kubectl version --client -o json 2>/dev/null | grep -oP '"gitVersion":\s*"\K[^"]+' || echo "unknown")"
-            if [ "$CURRENT_VERSION" = "$KUBECTL_VERSION" ]; then
-                info "kubectl already at latest version: $CURRENT_VERSION"
-            else
-                info "Updating kubectl from $CURRENT_VERSION to $KUBECTL_VERSION..."
-                if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
-                    chmod +x kubectl 2>/dev/null || true
-                    mv kubectl ~/.local/bin/ 2>/dev/null || { warning "Failed to update kubectl"; rm -f kubectl; }
-                    success "kubectl updated to $KUBECTL_VERSION"
-                else
-                    warning "Failed to download kubectl, skipping..."
-                fi
-            fi
+          success "kubectl installed"
         else
-            info "Installing kubectl..."
-            if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
-                chmod +x kubectl 2>/dev/null || true
-                mv kubectl ~/.local/bin/ 2>/dev/null || { warning "Failed to install kubectl"; rm -f kubectl; }
-                if command_exists kubectl; then
-                    success "kubectl installed"
-                else
-                    warning "kubectl installation failed"
-                fi
-            else
-                warning "Failed to download kubectl, skipping..."
-            fi
+          warning "kubectl installation failed"
         fi
+      else
+        warning "Failed to download kubectl, skipping..."
+      fi
     fi
+  fi
 
-    # Install helm
-    if command_exists helm; then
-        CURRENT_HELM=$(helm version --template='{{.Version}}' 2>/dev/null | sed 's/v//' || echo "unknown")
-        info "helm already installed: v$CURRENT_HELM"
-        info "Use 'helm repo update' to update repositories"
+  # Install helm
+  if command_exists helm; then
+    CURRENT_HELM=$(helm version --template='{{.Version}}' 2>/dev/null | sed 's/v//' || echo "unknown")
+    info "helm already installed: v$CURRENT_HELM"
+    info "Use 'helm repo update' to update repositories"
+  else
+    info "Installing helm..."
+    if curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 2>/dev/null | bash 2>/dev/null; then
+      success "helm installed"
     else
-        info "Installing helm..."
-        if curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 2>/dev/null | bash 2>/dev/null; then
-            success "helm installed"
+      warning "Failed to install helm, skipping..."
+    fi
+  fi
+
+  # Install minikube
+  if command_exists minikube; then
+    CURRENT_MINIKUBE=$(minikube version --short 2>/dev/null | sed 's/v//' || echo "unknown")
+    info "minikube already installed: v$CURRENT_MINIKUBE"
+    info "Use 'minikube update-check' to check for updates"
+  else
+    info "Installing minikube..."
+    if curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 2>/dev/null; then
+      chmod +x minikube-linux-amd64 2>/dev/null || true
+      mv minikube-linux-amd64 ~/.local/bin/minikube 2>/dev/null || {
+        warning "Failed to install minikube"
+        rm -f minikube-linux-amd64
+      }
+
+      if command_exists minikube; then
+        success "minikube installed"
+      else
+        warning "minikube installation failed"
+      fi
+    else
+      warning "Failed to download minikube, skipping..."
+    fi
+  fi
+
+  # Install kind (Kubernetes in Docker)
+  # Detect architecture
+  ARCH=$(uname -m)
+  case $ARCH in
+  x86_64) ARCH="amd64" ;;
+  aarch64) ARCH="arm64" ;;
+  *)
+    warning "Skipping kind - unsupported architecture: $ARCH"
+    return 0
+    ;;
+  esac
+
+  KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' 2>/dev/null || echo "")
+
+  if [ -z "$KIND_VERSION" ]; then
+    warning "Could not fetch kind version, skipping..."
+  else
+    if command_exists kind; then
+      CURRENT_KIND=$(kind version 2>/dev/null | grep -oP 'kind v\K[0-9.]+' || echo "unknown")
+      if [ "$CURRENT_KIND" = "$KIND_VERSION" ]; then
+        info "kind already at latest version: $CURRENT_KIND"
+      else
+        info "Updating kind from $CURRENT_KIND to $KIND_VERSION..."
+        if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
+          chmod +x ./kind 2>/dev/null || true
+          mv ./kind ~/.local/bin/kind 2>/dev/null || {
+            warning "Failed to update kind"
+            rm -f kind
+          }
+          success "kind updated to $KIND_VERSION"
         else
-            warning "Failed to install helm, skipping..."
+          warning "Failed to download kind, skipping..."
         fi
-    fi
-
-    # Install minikube
-    if command_exists minikube; then
-        CURRENT_MINIKUBE=$(minikube version --short 2>/dev/null | sed 's/v//' || echo "unknown")
-        info "minikube already installed: v$CURRENT_MINIKUBE"
-        info "Use 'minikube update-check' to check for updates"
+      fi
     else
-        info "Installing minikube..."
-        if curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 2>/dev/null; then
-            chmod +x minikube-linux-amd64 2>/dev/null || true
-            mv minikube-linux-amd64 ~/.local/bin/minikube 2>/dev/null || { warning "Failed to install minikube"; rm -f minikube-linux-amd64; }
+      info "Installing kind..."
+      if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
+        chmod +x ./kind 2>/dev/null || true
+        mv ./kind ~/.local/bin/kind 2>/dev/null || {
+          warning "Failed to install kind"
+          rm -f kind
+        }
 
-            if command_exists minikube; then
-                success "minikube installed"
-            else
-                warning "minikube installation failed"
-            fi
-        else
-            warning "Failed to download minikube, skipping..."
-        fi
-    fi
-
-    # Install kind (Kubernetes in Docker)
-    # Detect architecture
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)  ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
-        *)       warning "Skipping kind - unsupported architecture: $ARCH"; return 0 ;;
-    esac
-
-    KIND_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/kind/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' 2>/dev/null || echo "")
-
-    if [ -z "$KIND_VERSION" ]; then
-        warning "Could not fetch kind version, skipping..."
-    else
         if command_exists kind; then
-            CURRENT_KIND=$(kind version 2>/dev/null | grep -oP 'kind v\K[0-9.]+' || echo "unknown")
-            if [ "$CURRENT_KIND" = "$KIND_VERSION" ]; then
-                info "kind already at latest version: $CURRENT_KIND"
-            else
-                info "Updating kind from $CURRENT_KIND to $KIND_VERSION..."
-                if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
-                    chmod +x ./kind 2>/dev/null || true
-                    mv ./kind ~/.local/bin/kind 2>/dev/null || { warning "Failed to update kind"; rm -f kind; }
-                    success "kind updated to $KIND_VERSION"
-                else
-                    warning "Failed to download kind, skipping..."
-                fi
-            fi
+          success "kind installed"
         else
-            info "Installing kind..."
-            if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
-                chmod +x ./kind 2>/dev/null || true
-                mv ./kind ~/.local/bin/kind 2>/dev/null || { warning "Failed to install kind"; rm -f kind; }
-
-                if command_exists kind; then
-                    success "kind installed"
-                else
-                    warning "kind installation failed"
-                fi
-            else
-                warning "Failed to download kind, skipping..."
-            fi
+          warning "kind installation failed"
         fi
+      else
+        warning "Failed to download kind, skipping..."
+      fi
     fi
+  fi
 
-    # Install kubectx and kubens
-    if [ -d /opt/kubectx ]; then
-        info "kubectx already installed, updating..."
-        (cd /opt/kubectx && sudo git pull 2>/dev/null) && success "kubectx/kubens updated" || info "kubectx/kubens already up to date"
-        sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx 2>/dev/null || true
-        sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens 2>/dev/null || true
+  # Install kubectx and kubens
+  if [ -d /opt/kubectx ]; then
+    info "kubectx already installed, updating..."
+    (cd /opt/kubectx && sudo git pull 2>/dev/null) && success "kubectx/kubens updated" || info "kubectx/kubens already up to date"
+    sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx 2>/dev/null || true
+    sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens 2>/dev/null || true
+  else
+    info "Installing kubectx and kubens..."
+    if sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx 2>/dev/null; then
+      sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx 2>/dev/null || true
+      sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens 2>/dev/null || true
+      success "kubectx and kubens installed"
     else
-        info "Installing kubectx and kubens..."
-        if sudo git clone https://github.com/ahmetb/kubectx /opt/kubectx 2>/dev/null; then
-            sudo ln -sf /opt/kubectx/kubectx /usr/local/bin/kubectx 2>/dev/null || true
-            sudo ln -sf /opt/kubectx/kubens /usr/local/bin/kubens 2>/dev/null || true
-            success "kubectx and kubens installed"
-        else
-            warning "Failed to install kubectx/kubens, skipping..."
-        fi
+      warning "Failed to install kubectx/kubens, skipping..."
     fi
+  fi
 }
 
 # =============================================================================
@@ -1640,53 +1670,65 @@ install_kubernetes_tools() {
 # =============================================================================
 
 install_blesh() {
-    step "Installing ble.sh (bash auto-suggestions)"
+  step "Installing ble.sh (bash auto-suggestions)"
 
-    # Install gawk (required for building ble.sh)
-    if ! command_exists gawk; then
-        info "Installing gawk (required for ble.sh)..."
-        case "$PKG_MANAGER" in
-            apt)
-                $PKG_INSTALL gawk 2>/dev/null || { warning "Failed to install gawk, skipping ble.sh"; return 0; }
-                ;;
-            pacman)
-                $PKG_INSTALL gawk 2>/dev/null || { warning "Failed to install gawk, skipping ble.sh"; return 0; }
-                ;;
-            dnf|yum)
-                $PKG_INSTALL gawk 2>/dev/null || { warning "Failed to install gawk, skipping ble.sh"; return 0; }
-                ;;
-        esac
-    fi
+  # Install gawk (required for building ble.sh)
+  if ! command_exists gawk; then
+    info "Installing gawk (required for ble.sh)..."
+    case "$PKG_MANAGER" in
+    apt)
+      $PKG_INSTALL gawk 2>/dev/null || {
+        warning "Failed to install gawk, skipping ble.sh"
+        return 0
+      }
+      ;;
+    pacman)
+      $PKG_INSTALL gawk 2>/dev/null || {
+        warning "Failed to install gawk, skipping ble.sh"
+        return 0
+      }
+      ;;
+    dnf | yum)
+      $PKG_INSTALL gawk 2>/dev/null || {
+        warning "Failed to install gawk, skipping ble.sh"
+        return 0
+      }
+      ;;
+    esac
+  fi
 
-    if [[ -d ~/.local/share/blesh ]]; then
-        info "Updating ble.sh..."
-        cd ~/.local/share/blesh || { warning "Failed to access ble.sh directory"; return 0; }
+  if [[ -d ~/.local/share/blesh ]]; then
+    info "Updating ble.sh..."
+    cd ~/.local/share/blesh || {
+      warning "Failed to access ble.sh directory"
+      return 0
+    }
 
-        if git pull 2>/dev/null; then
-            if make install PREFIX=~/.local 2>/dev/null; then
-                success "ble.sh updated"
-            else
-                warning "Failed to build ble.sh update, skipping..."
-            fi
-        else
-            warning "Failed to update ble.sh, skipping..."
-        fi
-        cd - > /dev/null
+    if git pull 2>/dev/null; then
+      if make install PREFIX=~/.local 2>/dev/null; then
+        success "ble.sh updated"
+      else
+        warning "Failed to build ble.sh update, skipping..."
+      fi
     else
-        info "Installing ble.sh..."
-        if git clone --recursive --depth 1 --shallow-submodules \
-            https://github.com/akinomyoga/ble.sh.git ~/.local/share/blesh 2>/dev/null; then
-
-            if make -C ~/.local/share/blesh install PREFIX=~/.local 2>/dev/null; then
-                success "ble.sh installed"
-            else
-                warning "Failed to build ble.sh, skipping..."
-                rm -rf ~/.local/share/blesh
-            fi
-        else
-            warning "Failed to clone ble.sh repository, skipping..."
-        fi
+      warning "Failed to update ble.sh, skipping..."
     fi
+    cd - >/dev/null
+  else
+    info "Installing ble.sh..."
+    if git clone --recursive --depth 1 --shallow-submodules \
+      https://github.com/akinomyoga/ble.sh.git ~/.local/share/blesh 2>/dev/null; then
+
+      if make -C ~/.local/share/blesh install PREFIX=~/.local 2>/dev/null; then
+        success "ble.sh installed"
+      else
+        warning "Failed to build ble.sh, skipping..."
+        rm -rf ~/.local/share/blesh
+      fi
+    else
+      warning "Failed to clone ble.sh repository, skipping..."
+    fi
+  fi
 }
 
 # =============================================================================
@@ -1694,51 +1736,60 @@ install_blesh() {
 # =============================================================================
 
 install_lazydocker() {
-    step "Installing lazydocker"
+  step "Installing lazydocker"
 
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)  ARCH="x86_64" ;;
-        aarch64) ARCH="arm64" ;;
-        *)       warning "Unsupported architecture: $ARCH, skipping lazydocker"; return 0 ;;
-    esac
+  ARCH=$(uname -m)
+  case $ARCH in
+  x86_64) ARCH="x86_64" ;;
+  aarch64) ARCH="arm64" ;;
+  *)
+    warning "Unsupported architecture: $ARCH, skipping lazydocker"
+    return 0
+    ;;
+  esac
 
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazydocker/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  LATEST_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazydocker/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
-    if [ -z "$LATEST_VERSION" ]; then
-        warning "Could not fetch lazydocker version from GitHub API, skipping..."
-        return 0
+  if [ -z "$LATEST_VERSION" ]; then
+    warning "Could not fetch lazydocker version from GitHub API, skipping..."
+    return 0
+  fi
+
+  if command_exists lazydocker; then
+    CURRENT_VERSION=$(lazydocker --version 2>/dev/null | grep -oP 'Version: \K[0-9.]+' || echo "unknown")
+    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+      info "lazydocker already at latest version: $CURRENT_VERSION"
+      return
+    else
+      info "Updating lazydocker from $CURRENT_VERSION to $LATEST_VERSION"
     fi
+  fi
+
+  DOWNLOAD_URL="https://github.com/jesseduffield/lazydocker/releases/download/v${LATEST_VERSION}/lazydocker_${LATEST_VERSION}_Linux_${ARCH}.tar.gz"
+
+  info "Downloading lazydocker v${LATEST_VERSION}..."
+  if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/lazydocker.tar.gz 2>/dev/null; then
+    tar xzf /tmp/lazydocker.tar.gz -C /tmp 2>/dev/null || {
+      warning "Failed to extract lazydocker"
+      return 0
+    }
+    if [ -f /tmp/lazydocker ]; then
+      mv /tmp/lazydocker ~/.local/bin/ 2>/dev/null || {
+        warning "Failed to move lazydocker"
+        return 0
+      }
+      chmod +x ~/.local/bin/lazydocker 2>/dev/null || true
+    fi
+    rm -f /tmp/lazydocker.tar.gz
 
     if command_exists lazydocker; then
-        CURRENT_VERSION=$(lazydocker --version 2>/dev/null | grep -oP 'Version: \K[0-9.]+' || echo "unknown")
-        if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-            info "lazydocker already at latest version: $CURRENT_VERSION"
-            return
-        else
-            info "Updating lazydocker from $CURRENT_VERSION to $LATEST_VERSION"
-        fi
-    fi
-
-    DOWNLOAD_URL="https://github.com/jesseduffield/lazydocker/releases/download/v${LATEST_VERSION}/lazydocker_${LATEST_VERSION}_Linux_${ARCH}.tar.gz"
-
-    info "Downloading lazydocker v${LATEST_VERSION}..."
-    if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/lazydocker.tar.gz 2>/dev/null; then
-        tar xzf /tmp/lazydocker.tar.gz -C /tmp 2>/dev/null || { warning "Failed to extract lazydocker"; return 0; }
-        if [ -f /tmp/lazydocker ]; then
-            mv /tmp/lazydocker ~/.local/bin/ 2>/dev/null || { warning "Failed to move lazydocker"; return 0; }
-            chmod +x ~/.local/bin/lazydocker 2>/dev/null || true
-        fi
-        rm -f /tmp/lazydocker.tar.gz
-
-        if command_exists lazydocker; then
-            success "lazydocker installed/updated to v${LATEST_VERSION}"
-        else
-            warning "lazydocker installation failed"
-        fi
+      success "lazydocker installed/updated to v${LATEST_VERSION}"
     else
-        warning "Failed to download lazydocker, skipping..."
+      warning "lazydocker installation failed"
     fi
+  else
+    warning "Failed to download lazydocker, skipping..."
+  fi
 }
 
 # =============================================================================
@@ -1746,51 +1797,60 @@ install_lazydocker() {
 # =============================================================================
 
 install_k9s() {
-    step "Installing k9s"
+  step "Installing k9s"
 
-    ARCH=$(uname -m)
-    case $ARCH in
-        x86_64)  ARCH="amd64" ;;
-        aarch64) ARCH="arm64" ;;
-        *)       warning "Unsupported architecture: $ARCH, skipping k9s"; return 0 ;;
-    esac
+  ARCH=$(uname -m)
+  case $ARCH in
+  x86_64) ARCH="amd64" ;;
+  aarch64) ARCH="arm64" ;;
+  *)
+    warning "Unsupported architecture: $ARCH, skipping k9s"
+    return 0
+    ;;
+  esac
 
-    LATEST_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  LATEST_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
-    if [ -z "$LATEST_VERSION" ]; then
-        warning "Could not fetch k9s version from GitHub API, skipping..."
-        return 0
+  if [ -z "$LATEST_VERSION" ]; then
+    warning "Could not fetch k9s version from GitHub API, skipping..."
+    return 0
+  fi
+
+  if command_exists k9s; then
+    CURRENT_VERSION=$(k9s version -s 2>/dev/null | grep -oP 'Version\s+\K[0-9.]+' | head -1 || echo "unknown")
+    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
+      info "k9s already at latest version: $CURRENT_VERSION"
+      return
+    else
+      info "Updating k9s from $CURRENT_VERSION to $LATEST_VERSION"
     fi
+  fi
+
+  DOWNLOAD_URL="https://github.com/derailed/k9s/releases/download/v${LATEST_VERSION}/k9s_Linux_${ARCH}.tar.gz"
+
+  info "Downloading k9s v${LATEST_VERSION}..."
+  if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/k9s.tar.gz 2>/dev/null; then
+    tar xzf /tmp/k9s.tar.gz -C /tmp 2>/dev/null || {
+      warning "Failed to extract k9s"
+      return 0
+    }
+    if [ -f /tmp/k9s ]; then
+      mv /tmp/k9s ~/.local/bin/ 2>/dev/null || {
+        warning "Failed to move k9s"
+        return 0
+      }
+      chmod +x ~/.local/bin/k9s 2>/dev/null || true
+    fi
+    rm -f /tmp/k9s.tar.gz
 
     if command_exists k9s; then
-        CURRENT_VERSION=$(k9s version -s 2>/dev/null | grep -oP 'Version\s+\K[0-9.]+' | head -1 || echo "unknown")
-        if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-            info "k9s already at latest version: $CURRENT_VERSION"
-            return
-        else
-            info "Updating k9s from $CURRENT_VERSION to $LATEST_VERSION"
-        fi
-    fi
-
-    DOWNLOAD_URL="https://github.com/derailed/k9s/releases/download/v${LATEST_VERSION}/k9s_Linux_${ARCH}.tar.gz"
-
-    info "Downloading k9s v${LATEST_VERSION}..."
-    if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/k9s.tar.gz 2>/dev/null; then
-        tar xzf /tmp/k9s.tar.gz -C /tmp 2>/dev/null || { warning "Failed to extract k9s"; return 0; }
-        if [ -f /tmp/k9s ]; then
-            mv /tmp/k9s ~/.local/bin/ 2>/dev/null || { warning "Failed to move k9s"; return 0; }
-            chmod +x ~/.local/bin/k9s 2>/dev/null || true
-        fi
-        rm -f /tmp/k9s.tar.gz
-
-        if command_exists k9s; then
-            success "k9s installed/updated to v${LATEST_VERSION}"
-        else
-            warning "k9s installation failed"
-        fi
+      success "k9s installed/updated to v${LATEST_VERSION}"
     else
-        warning "Failed to download k9s, skipping..."
+      warning "k9s installation failed"
     fi
+  else
+    warning "Failed to download k9s, skipping..."
+  fi
 }
 
 # =============================================================================
@@ -1798,70 +1858,70 @@ install_k9s() {
 # =============================================================================
 
 setup_configs() {
-    step "Setting up configuration files"
+  step "Setting up configuration files"
 
-    # Backup existing configs
-    backup_dir="$HOME/.config-backup-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$backup_dir"
+  # Backup existing configs
+  backup_dir="$HOME/.config-backup-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "$backup_dir"
 
-    # Backup existing files
-    [ -f ~/.bashrc ] && cp ~/.bashrc "$backup_dir/"
-    [ -f ~/.bash_aliases ] && cp ~/.bash_aliases "$backup_dir/"
-    [ -f ~/.gitconfig ] && cp ~/.gitconfig "$backup_dir/"
-    [ -f ~/.inputrc ] && cp ~/.inputrc "$backup_dir/"
+  # Backup existing files
+  [ -f ~/.bashrc ] && cp ~/.bashrc "$backup_dir/"
+  [ -f ~/.bash_aliases ] && cp ~/.bash_aliases "$backup_dir/"
+  [ -f ~/.gitconfig ] && cp ~/.gitconfig "$backup_dir/"
+  [ -f ~/.inputrc ] && cp ~/.inputrc "$backup_dir/"
 
-    info "Backed up existing configs to: $backup_dir"
+  info "Backed up existing configs to: $backup_dir"
 
-    # Symlink or copy configs
-    if [ -d "$SCRIPT_DIR" ]; then
-        info "Symlinking configuration files..."
+  # Symlink or copy configs
+  if [ -d "$SCRIPT_DIR" ]; then
+    info "Symlinking configuration files..."
 
-        # Bash configs
-        ln -sf "$SCRIPT_DIR/bashrc" ~/.bashrc
-        ln -sf "$SCRIPT_DIR/.bash_aliases" ~/.bash_aliases
-        ln -sf "$SCRIPT_DIR/.inputrc" ~/.inputrc
+    # Bash configs
+    ln -sf "$SCRIPT_DIR/bashrc" ~/.bashrc
+    ln -sf "$SCRIPT_DIR/.bash_aliases" ~/.bash_aliases
+    ln -sf "$SCRIPT_DIR/.inputrc" ~/.inputrc
 
-        # Git config
-        ln -sf "$SCRIPT_DIR/.gitconfig" ~/.gitconfig
+    # Git config
+    ln -sf "$SCRIPT_DIR/.gitconfig" ~/.gitconfig
 
-        # Tmux
-        mkdir -p ~/.config/tmux
-        ln -sf "$SCRIPT_DIR/tmux/tmux.conf" ~/.config/tmux/tmux.conf
+    # Tmux
+    mkdir -p ~/.config/tmux
+    ln -sf "$SCRIPT_DIR/tmux/tmux.conf" ~/.config/tmux/tmux.conf
 
-        # Alacritty
-        mkdir -p ~/.config/alacritty
-        ln -sf "$SCRIPT_DIR/alacritty/alacritty.toml" ~/.config/alacritty/alacritty.toml
+    # Alacritty
+    mkdir -p ~/.config/alacritty
+    ln -sf "$SCRIPT_DIR/alacritty/alacritty.toml" ~/.config/alacritty/alacritty.toml
 
-        # Oh-my-posh theme
-        mkdir -p ~/.config
-        ln -sf "$SCRIPT_DIR/oh-my-posh/dark-colorblind.omp.json" ~/.config/oh-my-posh-dark-colorblind.omp.json
+    # Oh-my-posh theme
+    mkdir -p ~/.config
+    ln -sf "$SCRIPT_DIR/oh-my-posh/dark-colorblind.omp.json" ~/.config/oh-my-posh-dark-colorblind.omp.json
 
-        # Neovim
-        mkdir -p ~/.config/nvim
-        [ -d "$SCRIPT_DIR/nvim" ] && ln -sf "$SCRIPT_DIR/nvim" ~/.config/nvim
+    # Neovim
+    mkdir -p ~/.config/nvim
+    [ -d "$SCRIPT_DIR/nvim" ] && ln -sf "$SCRIPT_DIR/nvim" ~/.config/nvim
 
-        # k9s
-        mkdir -p ~/.config/k9s/skins
-        [ -f "$SCRIPT_DIR/k9s/config.yaml" ] && ln -sf "$SCRIPT_DIR/k9s/config.yaml" ~/.config/k9s/config.yaml
-        [ -f "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ] && ln -sf "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ~/.config/k9s/skins/github-dark.yaml
+    # k9s
+    mkdir -p ~/.config/k9s/skins
+    [ -f "$SCRIPT_DIR/k9s/config.yaml" ] && ln -sf "$SCRIPT_DIR/k9s/config.yaml" ~/.config/k9s/config.yaml
+    [ -f "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ] && ln -sf "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ~/.config/k9s/skins/github-dark.yaml
 
-        # lazydocker
-        mkdir -p ~/.config/lazydocker
-        [ -f "$SCRIPT_DIR/lazydocker/config.yml" ] && ln -sf "$SCRIPT_DIR/lazydocker/config.yml" ~/.config/lazydocker/config.yml
+    # lazydocker
+    mkdir -p ~/.config/lazydocker
+    [ -f "$SCRIPT_DIR/lazydocker/config.yml" ] && ln -sf "$SCRIPT_DIR/lazydocker/config.yml" ~/.config/lazydocker/config.yml
 
-        # Bin scripts
-        mkdir -p ~/bin
-        if [ -d "$SCRIPT_DIR/bin" ]; then
-            for script in "$SCRIPT_DIR/bin"/*; do
-                [ -f "$script" ] && ln -sf "$script" ~/bin/$(basename "$script")
-            done
-        fi
-
-        success "Configuration files symlinked"
-    else
-        error "Config directory not found: $SCRIPT_DIR"
-        return 1
+    # Bin scripts
+    mkdir -p ~/bin
+    if [ -d "$SCRIPT_DIR/bin" ]; then
+      for script in "$SCRIPT_DIR/bin"/*; do
+        [ -f "$script" ] && ln -sf "$script" ~/bin/$(basename "$script")
+      done
     fi
+
+    success "Configuration files symlinked"
+  else
+    error "Config directory not found: $SCRIPT_DIR"
+    return 1
+  fi
 }
 
 # =============================================================================
@@ -1869,15 +1929,15 @@ setup_configs() {
 # =============================================================================
 
 install_tmux_plugins() {
-    step "Installing Tmux Plugin Manager"
+  step "Installing Tmux Plugin Manager"
 
-    if [ ! -d ~/.tmux/plugins/tpm ]; then
-        git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
-        success "TPM installed"
-        info "Run 'tmux' and press Ctrl+g + I to install tmux plugins"
-    else
-        info "TPM already installed"
-    fi
+  if [ ! -d ~/.tmux/plugins/tpm ]; then
+    git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+    success "TPM installed"
+    info "Run 'tmux' and press Ctrl+g + I to install tmux plugins"
+  else
+    info "TPM already installed"
+  fi
 }
 
 # =============================================================================
@@ -1885,14 +1945,14 @@ install_tmux_plugins() {
 # =============================================================================
 
 create_tool_configs() {
-    step "Creating k9s and lazydocker configurations"
+  step "Creating k9s and lazydocker configurations"
 
-    # Create k9s config directory
-    mkdir -p ~/.config/k9s/skins
+  # Create k9s config directory
+  mkdir -p ~/.config/k9s/skins
 
-    # Only create if doesn't exist (don't overwrite symlinks)
-    if [ ! -f ~/.config/k9s/config.yaml ]; then
-        cat > ~/.config/k9s/config.yaml << 'EOF'
+  # Only create if doesn't exist (don't overwrite symlinks)
+  if [ ! -f ~/.config/k9s/config.yaml ]; then
+    cat >~/.config/k9s/config.yaml <<'EOF'
 k9s:
   liveViewAutoRefresh: false
   refreshRate: 2
@@ -1908,22 +1968,22 @@ k9s:
     buffer: 5000
     sinceSeconds: 60
 EOF
-    fi
+  fi
 
-    if [ ! -f ~/.config/k9s/skins/github-dark.yaml ]; then
-        # Copy the skin from the script directory or create default
-        if [ -f "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ]; then
-            cp "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ~/.config/k9s/skins/
-        fi
+  if [ ! -f ~/.config/k9s/skins/github-dark.yaml ]; then
+    # Copy the skin from the script directory or create default
+    if [ -f "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ]; then
+      cp "$SCRIPT_DIR/k9s/skins/github-dark.yaml" ~/.config/k9s/skins/
     fi
+  fi
 
-    # Create lazydocker config
-    mkdir -p ~/.config/lazydocker
-    if [ ! -f ~/.config/lazydocker/config.yml ] && [ -f "$SCRIPT_DIR/lazydocker/config.yml" ]; then
-        cp "$SCRIPT_DIR/lazydocker/config.yml" ~/.config/lazydocker/
-    fi
+  # Create lazydocker config
+  mkdir -p ~/.config/lazydocker
+  if [ ! -f ~/.config/lazydocker/config.yml ] && [ -f "$SCRIPT_DIR/lazydocker/config.yml" ]; then
+    cp "$SCRIPT_DIR/lazydocker/config.yml" ~/.config/lazydocker/
+  fi
 
-    success "Tool configurations created"
+  success "Tool configurations created"
 }
 
 # =============================================================================
@@ -1931,19 +1991,19 @@ EOF
 # =============================================================================
 
 final_setup() {
-    step "Final setup and verification"
+  step "Final setup and verification"
 
-    # Ensure ~/.local/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && [[ ":$PATH:" != *":~/.local/bin:"* ]]; then
-        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-    fi
+  # Ensure ~/.local/bin is in PATH
+  if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]] && [[ ":$PATH:" != *":~/.local/bin:"* ]]; then
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >>~/.bashrc
+  fi
 
-    # Ensure ~/bin is in PATH
-    if [[ ":$PATH:" != *":$HOME/bin:"* ]] && [[ ":$PATH:" != *":~/bin:"* ]]; then
-        echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
-    fi
+  # Ensure ~/bin is in PATH
+  if [[ ":$PATH:" != *":$HOME/bin:"* ]] && [[ ":$PATH:" != *":~/bin:"* ]]; then
+    echo 'export PATH="$HOME/bin:$PATH"' >>~/.bashrc
+  fi
 
-    success "Setup complete!"
+  success "Setup complete!"
 }
 
 # =============================================================================
@@ -1951,117 +2011,117 @@ final_setup() {
 # =============================================================================
 
 print_summary() {
-    echo ""
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                    Setup Complete!                         ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
-    echo ""
-    echo -e "${CYAN}📦 Installed Tools:${NC}"
-    echo ""
-    echo -e "${MAGENTA}Modern CLI Tools:${NC}"
-    echo -e "  ${GREEN}✓${NC} bat, eza, ripgrep, fd, fzf, lazygit"
-    echo -e "  ${GREEN}✓${NC} btop/bottom, dust, duf"
-    echo -e "  ${GREEN}✓${NC} zoxide, sesh, tmux, neovim"
-    echo ""
-    echo -e "${MAGENTA}Container & Orchestration:${NC}"
-    echo -e "  ${GREEN}✓${NC} Docker + Docker Compose"
-    echo -e "  ${GREEN}✓${NC} lazydocker (TUI for Docker)"
-    echo ""
-    echo -e "${MAGENTA}Kubernetes Tools:${NC}"
-    echo -e "  ${GREEN}✓${NC} kubectl (K8s CLI)"
-    echo -e "  ${GREEN}✓${NC} helm (K8s package manager)"
-    echo -e "  ${GREEN}✓${NC} minikube (local K8s cluster)"
-    echo -e "  ${GREEN}✓${NC} kind (Kubernetes in Docker)"
-    echo -e "  ${GREEN}✓${NC} k9s (K8s TUI)"
-    echo -e "  ${GREEN}✓${NC} kubectx & kubens (context/namespace switcher)"
-    echo ""
-    echo -e "${MAGENTA}Multimedia & Development Libraries:${NC}"
-    echo -e "  ${GREEN}✓${NC} FFmpeg + full codec support"
-    echo -e "  ${GREEN}✓${NC} WebRTC libraries (opus, vpx, x264, x265, etc.)"
-    echo -e "  ${GREEN}✓${NC} Video/Audio processing libs"
-    echo ""
-    echo -e "${MAGENTA}C++ Build Tools (C++23 Support):${NC}"
-    echo -e "  ${GREEN}✓${NC} GCC 13/14 + Clang 18"
-    echo -e "  ${GREEN}✓${NC} CMake, Ninja, Meson"
-    echo -e "  ${GREEN}✓${NC} vcpkg (C++ package manager)"
-    echo -e "  ${GREEN}✓${NC} Boost, Eigen, fmt, spdlog"
-    echo -e "  ${GREEN}✓${NC} GoogleTest, Catch2, Benchmark"
-    echo -e "  ${GREEN}✓${NC} Valgrind, GDB, LLDB"
-    echo ""
-    echo -e "${MAGENTA}Programming Languages:${NC}"
-    echo -e "  ${GREEN}✓${NC} Golang (latest stable version)"
-    echo -e "  ${GREEN}✓${NC} Rust + Cargo + utilities"
-    echo -e "  ${GREEN}✓${NC} Python (pyenv, poetry, pip tools)"
-    echo -e "  ${GREEN}✓${NC} NVM (Node.js version manager)"
-    echo ""
-    echo -e "${MAGENTA}Neovim & AstroNvim:${NC}"
-    echo -e "  ${GREEN}✓${NC} Neovim (built from source - latest)"
-    echo -e "  ${GREEN}✓${NC} AstroNvim (fully configured)"
-    echo -e "  ${GREEN}✓${NC} Tree-sitter (syntax highlighting)"
-    echo -e "  ${GREEN}✓${NC} Language servers (8+ LSPs installed)"
-    echo -e "  ${GREEN}✓${NC} Rust-analyzer, Pyright, TypeScript, etc."
-    echo ""
-    echo -e "${MAGENTA}Terminal & Fonts:${NC}"
-    echo -e "  ${GREEN}✓${NC} Alacritty (GPU-accelerated terminal)"
-    echo -e "  ${GREEN}✓${NC} Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
-    echo -e "  ${GREEN}✓${NC} Tmux (with 5 plugins)"
-    echo ""
-    echo -e "${MAGENTA}Shell Enhancements:${NC}"
-    echo -e "  ${GREEN}✓${NC} ble.sh (auto-suggestions & syntax highlighting)"
-    echo -e "  ${GREEN}✓${NC} oh-my-posh (beautiful prompt)"
-    echo -e "  ${GREEN}✓${NC} zoxide (smart directory jumper)"
-    echo ""
-    echo -e "${MAGENTA}Rust Utilities:${NC}"
-    echo -e "  ${GREEN}✓${NC} cargo-edit, cargo-watch, cargo-audit"
-    echo -e "  ${GREEN}✓${NC} tokei, hyperfine, sd, procs"
-    echo -e "  ${GREEN}✓${NC} zellij (terminal multiplexer)"
-    echo ""
-    echo -e "${MAGENTA}Configurations:${NC}"
-    echo -e "  ${GREEN}✓${NC} bashrc, bash_aliases (60+ aliases)"
-    echo -e "  ${GREEN}✓${NC} gitconfig, inputrc"
-    echo -e "  ${GREEN}✓${NC} tmux.conf (Zellij-style keybindings)"
-    echo -e "  ${GREEN}✓${NC} alacritty.toml (GitHub Dark theme)"
-    echo -e "  ${GREEN}✓${NC} k9s, lazydocker, neovim configs"
-    echo ""
-    echo -e "${CYAN}Next Steps:${NC}"
-    echo ""
-    echo "  1. ${YELLOW}Reload your shell:${NC}"
-    echo "     source ~/.bashrc"
-    echo ""
-    echo "  2. ${YELLOW}Start tmux and install plugins:${NC}"
-    echo "     tmux"
-    echo "     # Press Ctrl+g then Shift+I to install plugins"
-    echo ""
-    echo "  3. ${YELLOW}Try Docker:${NC}"
-    echo "     docker run hello-world"
-    echo "     lzd         # LazyDocker TUI"
-    echo ""
-    echo "  4. ${YELLOW}Setup Kubernetes (choose one):${NC}"
-    echo "     minikube start              # Local cluster (easiest)"
-    echo "     kind create cluster         # K8s in Docker (lightweight)"
-    echo "     k9s                         # Kubernetes TUI"
-    echo ""
-    echo "  5. ${YELLOW}Test CLI tools:${NC}"
-    echo "     ll          # eza with icons"
-    echo "     frg         # Search with preview"
-    echo "     zi          # Interactive directory jump"
-    echo "     lazygit     # Git TUI"
-    echo ""
-    echo "  6. ${YELLOW}Install fonts for icons:${NC}"
-    echo "     https://www.nerdfonts.com/font-downloads"
-    echo "     Installed: FiraCode, Iosevka, Proggy Clean, Lekton"
-    echo ""
-    if groups | grep -q docker; then
-        echo -e "${GREEN}✓${NC} You're in the docker group"
-    else
-        echo -e "${YELLOW}!${NC} Logout and login again to use Docker without sudo"
-    fi
-    echo ""
-    echo -e "${CYAN}📚 Documentation:${NC}"
-    echo "  - Quick Start: ~/configs/README.md"
-    echo "  - Full Guide:  ~/configs/BOOTSTRAP.md"
-    echo "  - Tmux Keys:   ~/configs/tmux/keyboard-shortcuts.md"
-    echo ""
+  echo ""
+  echo "╔════════════════════════════════════════════════════════════╗"
+  echo "║                    Setup Complete!                         ║"
+  echo "╚════════════════════════════════════════════════════════════╝"
+  echo ""
+  echo -e "${CYAN}📦 Installed Tools:${NC}"
+  echo ""
+  echo -e "${MAGENTA}Modern CLI Tools:${NC}"
+  echo -e "  ${GREEN}✓${NC} bat, eza, ripgrep, fd, fzf, lazygit"
+  echo -e "  ${GREEN}✓${NC} btop/bottom, dust, duf"
+  echo -e "  ${GREEN}✓${NC} zoxide, sesh, tmux, neovim"
+  echo ""
+  echo -e "${MAGENTA}Container & Orchestration:${NC}"
+  echo -e "  ${GREEN}✓${NC} Docker + Docker Compose"
+  echo -e "  ${GREEN}✓${NC} lazydocker (TUI for Docker)"
+  echo ""
+  echo -e "${MAGENTA}Kubernetes Tools:${NC}"
+  echo -e "  ${GREEN}✓${NC} kubectl (K8s CLI)"
+  echo -e "  ${GREEN}✓${NC} helm (K8s package manager)"
+  echo -e "  ${GREEN}✓${NC} minikube (local K8s cluster)"
+  echo -e "  ${GREEN}✓${NC} kind (Kubernetes in Docker)"
+  echo -e "  ${GREEN}✓${NC} k9s (K8s TUI)"
+  echo -e "  ${GREEN}✓${NC} kubectx & kubens (context/namespace switcher)"
+  echo ""
+  echo -e "${MAGENTA}Multimedia & Development Libraries:${NC}"
+  echo -e "  ${GREEN}✓${NC} FFmpeg + full codec support"
+  echo -e "  ${GREEN}✓${NC} WebRTC libraries (opus, vpx, x264, x265, etc.)"
+  echo -e "  ${GREEN}✓${NC} Video/Audio processing libs"
+  echo ""
+  echo -e "${MAGENTA}C++ Build Tools (C++23 Support):${NC}"
+  echo -e "  ${GREEN}✓${NC} GCC 13/14 + Clang 18"
+  echo -e "  ${GREEN}✓${NC} CMake, Ninja, Meson"
+  echo -e "  ${GREEN}✓${NC} vcpkg (C++ package manager)"
+  echo -e "  ${GREEN}✓${NC} Boost, Eigen, fmt, spdlog"
+  echo -e "  ${GREEN}✓${NC} GoogleTest, Catch2, Benchmark"
+  echo -e "  ${GREEN}✓${NC} Valgrind, GDB, LLDB"
+  echo ""
+  echo -e "${MAGENTA}Programming Languages:${NC}"
+  echo -e "  ${GREEN}✓${NC} Golang (latest stable version)"
+  echo -e "  ${GREEN}✓${NC} Rust + Cargo + utilities"
+  echo -e "  ${GREEN}✓${NC} Python (pyenv, poetry, pip tools)"
+  echo -e "  ${GREEN}✓${NC} NVM (Node.js version manager)"
+  echo ""
+  echo -e "${MAGENTA}Neovim & AstroNvim:${NC}"
+  echo -e "  ${GREEN}✓${NC} Neovim (built from source - latest)"
+  echo -e "  ${GREEN}✓${NC} AstroNvim (fully configured)"
+  echo -e "  ${GREEN}✓${NC} Tree-sitter (syntax highlighting)"
+  echo -e "  ${GREEN}✓${NC} Language servers (8+ LSPs installed)"
+  echo -e "  ${GREEN}✓${NC} Rust-analyzer, Pyright, TypeScript, etc."
+  echo ""
+  echo -e "${MAGENTA}Terminal & Fonts:${NC}"
+  echo -e "  ${GREEN}✓${NC} Alacritty (GPU-accelerated terminal)"
+  echo -e "  ${GREEN}✓${NC} Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
+  echo -e "  ${GREEN}✓${NC} Tmux (with 5 plugins)"
+  echo ""
+  echo -e "${MAGENTA}Shell Enhancements:${NC}"
+  echo -e "  ${GREEN}✓${NC} ble.sh (auto-suggestions & syntax highlighting)"
+  echo -e "  ${GREEN}✓${NC} oh-my-posh (beautiful prompt)"
+  echo -e "  ${GREEN}✓${NC} zoxide (smart directory jumper)"
+  echo ""
+  echo -e "${MAGENTA}Rust Utilities:${NC}"
+  echo -e "  ${GREEN}✓${NC} cargo-edit, cargo-watch, cargo-audit"
+  echo -e "  ${GREEN}✓${NC} tokei, hyperfine, sd, procs"
+  echo -e "  ${GREEN}✓${NC} zellij (terminal multiplexer)"
+  echo ""
+  echo -e "${MAGENTA}Configurations:${NC}"
+  echo -e "  ${GREEN}✓${NC} bashrc, bash_aliases (60+ aliases)"
+  echo -e "  ${GREEN}✓${NC} gitconfig, inputrc"
+  echo -e "  ${GREEN}✓${NC} tmux.conf (Zellij-style keybindings)"
+  echo -e "  ${GREEN}✓${NC} alacritty.toml (GitHub Dark theme)"
+  echo -e "  ${GREEN}✓${NC} k9s, lazydocker, neovim configs"
+  echo ""
+  echo -e "${CYAN}Next Steps:${NC}"
+  echo ""
+  echo "  1. ${YELLOW}Reload your shell:${NC}"
+  echo "     source ~/.bashrc"
+  echo ""
+  echo "  2. ${YELLOW}Start tmux and install plugins:${NC}"
+  echo "     tmux"
+  echo "     # Press Ctrl+g then Shift+I to install plugins"
+  echo ""
+  echo "  3. ${YELLOW}Try Docker:${NC}"
+  echo "     docker run hello-world"
+  echo "     lzd         # LazyDocker TUI"
+  echo ""
+  echo "  4. ${YELLOW}Setup Kubernetes (choose one):${NC}"
+  echo "     minikube start              # Local cluster (easiest)"
+  echo "     kind create cluster         # K8s in Docker (lightweight)"
+  echo "     k9s                         # Kubernetes TUI"
+  echo ""
+  echo "  5. ${YELLOW}Test CLI tools:${NC}"
+  echo "     ll          # eza with icons"
+  echo "     frg         # Search with preview"
+  echo "     zi          # Interactive directory jump"
+  echo "     lazygit     # Git TUI"
+  echo ""
+  echo "  6. ${YELLOW}Install fonts for icons:${NC}"
+  echo "     https://www.nerdfonts.com/font-downloads"
+  echo "     Installed: FiraCode, Iosevka, Proggy Clean, Lekton"
+  echo ""
+  if groups | grep -q docker; then
+    echo -e "${GREEN}✓${NC} You're in the docker group"
+  else
+    echo -e "${YELLOW}!${NC} Logout and login again to use Docker without sudo"
+  fi
+  echo ""
+  echo -e "${CYAN}📚 Documentation:${NC}"
+  echo "  - Quick Start: ~/configs/README.md"
+  echo "  - Full Guide:  ~/configs/BOOTSTRAP.md"
+  echo "  - Tmux Keys:   ~/configs/tmux/keyboard-shortcuts.md"
+  echo ""
 }
 
 # =============================================================================
@@ -2069,130 +2129,136 @@ print_summary() {
 # =============================================================================
 
 show_menu() {
-    clear
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║     Universal Linux Development Environment Bootstrap      ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
-    echo ""
-    echo "Select installation type:"
-    echo ""
-    echo "  1) Full Installation (Everything)"
-    echo "  2) Minimal (CLI tools + configs only)"
-    echo "  3) Custom (Choose components)"
-    echo "  4) Exit"
-    echo ""
-    read -p "Enter choice [1-4]: " choice
+  clear
+  echo "╔════════════════════════════════════════════════════════════╗"
+  echo "║     Universal Linux Development Environment Bootstrap      ║"
+  echo "╚════════════════════════════════════════════════════════════╝"
+  echo ""
+  echo "Select installation type:"
+  echo ""
+  echo "  1) Full Installation (Everything)"
+  echo "  2) Minimal (CLI tools + configs only)"
+  echo "  3) Custom (Choose components)"
+  echo "  4) Exit"
+  echo ""
+  read -p "Enter choice [1-4]: " choice
 
-    case $choice in
-        1) full_installation ;;
-        2) minimal_installation ;;
-        3) custom_installation ;;
-        4) exit 0 ;;
-        *) error "Invalid choice"; show_menu ;;
-    esac
+  case $choice in
+  1) full_installation ;;
+  2) minimal_installation ;;
+  3) custom_installation ;;
+  4) exit 0 ;;
+  *)
+    error "Invalid choice"
+    show_menu
+    ;;
+  esac
 }
 
 full_installation() {
-    detect_distro
-    install_base_packages
-    install_modern_cli_tools
-    install_multimedia_tools
-    install_cpp_build_tools
-    install_python_dev_tools
-    install_golang
-    install_vcpkg
-    install_rust_utilities
-    install_zoxide
-    install_oh_my_posh
-    install_sesh
-    install_nvm
-    install_alacritty
-    install_nerd_fonts
-    install_docker
-    install_kubernetes_tools
-    install_blesh
-    install_lazydocker
-    install_k9s
-    build_neovim_from_source
-    setup_astronvim
-    setup_configs
-    install_tmux_plugins
-    create_tool_configs
-    final_setup
-    print_summary
+  detect_distro
+  install_base_packages
+  install_modern_cli_tools
+  install_multimedia_tools
+  install_cpp_build_tools
+  install_python_dev_tools
+  install_golang
+  install_vcpkg
+  install_rust_utilities
+  install_zoxide
+  install_oh_my_posh
+  install_sesh
+  install_nvm
+  install_alacritty
+  install_nerd_fonts
+  install_docker
+  install_kubernetes_tools
+  install_blesh
+  install_lazydocker
+  install_k9s
+  build_neovim_from_source
+  setup_astronvim
+  setup_configs
+  install_tmux_plugins
+  create_tool_configs
+  final_setup
+  print_summary
 }
 
 minimal_installation() {
-    detect_distro
-    install_base_packages
-    install_modern_cli_tools
-    install_zoxide
-    install_oh_my_posh
-    install_sesh
-    install_blesh
-    setup_configs
-    install_tmux_plugins
-    final_setup
-    print_summary
+  detect_distro
+  install_base_packages
+  install_modern_cli_tools
+  install_zoxide
+  install_oh_my_posh
+  install_sesh
+  install_blesh
+  setup_configs
+  install_tmux_plugins
+  final_setup
+  print_summary
 }
 
 custom_installation() {
-    detect_distro
-    install_base_packages
+  detect_distro
+  install_base_packages
 
-    echo ""
-    echo "Select components to install (space-separated numbers):"
-    echo "   1) Modern CLI tools (bat, eza, ripgrep, fzf, etc.)"
-    echo "   2) Multimedia tools (FFmpeg, WebRTC libs)"
-    echo "   3) C++23 build tools (GCC 14, Clang 18, CMake, etc.)"
-    echo "   4) Python dev tools (pyenv, poetry, pip tools)"
-    echo "   5) Golang"
-    echo "   6) vcpkg (C++ package manager)"
-    echo "   7) Rust utilities (cargo tools, zellij, etc.)"
-    echo "   8) Zoxide (smart cd)"
-    echo "   9) Oh-my-posh (prompt)"
-    echo "  10) Sesh (tmux session manager)"
-    echo "  11) NVM (Node Version Manager)"
-    echo "  12) Alacritty (terminal emulator)"
-    echo "  13) Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
-    echo "  14) Docker + Docker Compose"
-    echo "  15) Kubernetes tools (kubectl, helm, minikube, kind, k9s, kubectx)"
-    echo "  16) ble.sh (bash auto-suggestions)"
-    echo "  17) lazydocker + k9s (TUIs)"
-    echo "  18) Build Neovim from source"
-    echo "  19) Setup AstroNvim with all dependencies"
-    echo ""
-    read -p "Components: " -a components
+  echo ""
+  echo "Select components to install (space-separated numbers):"
+  echo "   1) Modern CLI tools (bat, eza, ripgrep, fzf, etc.)"
+  echo "   2) Multimedia tools (FFmpeg, WebRTC libs)"
+  echo "   3) C++23 build tools (GCC 14, Clang 18, CMake, etc.)"
+  echo "   4) Python dev tools (pyenv, poetry, pip tools)"
+  echo "   5) Golang"
+  echo "   6) vcpkg (C++ package manager)"
+  echo "   7) Rust utilities (cargo tools, zellij, etc.)"
+  echo "   8) Zoxide (smart cd)"
+  echo "   9) Oh-my-posh (prompt)"
+  echo "  10) Sesh (tmux session manager)"
+  echo "  11) NVM (Node Version Manager)"
+  echo "  12) Alacritty (terminal emulator)"
+  echo "  13) Nerd Fonts (FiraCode, Iosevka, Proggy Clean, Lekton)"
+  echo "  14) Docker + Docker Compose"
+  echo "  15) Kubernetes tools (kubectl, helm, minikube, kind, k9s, kubectx)"
+  echo "  16) ble.sh (bash auto-suggestions)"
+  echo "  17) lazydocker + k9s (TUIs)"
+  echo "  18) Build Neovim from source"
+  echo "  19) Setup AstroNvim with all dependencies"
+  echo ""
+  read -p "Components: " -a components
 
-    for comp in "${components[@]}"; do
-        case $comp in
-            1) install_modern_cli_tools ;;
-            2) install_multimedia_tools ;;
-            3) install_cpp_build_tools ;;
-            4) install_python_dev_tools ;;
-            5) install_golang ;;
-            6) install_vcpkg ;;
-            7) install_rust_utilities ;;
-            8) install_zoxide ;;
-            9) install_oh_my_posh ;;
-            10) install_sesh ;;
-            11) install_nvm ;;
-            12) install_alacritty ;;
-            13) install_nerd_fonts ;;
-            14) install_docker ;;
-            15) install_kubernetes_tools ;;
-            16) install_blesh ;;
-            17) install_lazydocker; install_k9s ;;
-            18) build_neovim_from_source ;;
-            19) setup_astronvim ;;
-        esac
-    done
+  for comp in "${components[@]}"; do
+    case $comp in
+    1) install_modern_cli_tools ;;
+    2) install_multimedia_tools ;;
+    3) install_cpp_build_tools ;;
+    4) install_python_dev_tools ;;
+    5) install_golang ;;
+    6) install_vcpkg ;;
+    7) install_rust_utilities ;;
+    8) install_zoxide ;;
+    9) install_oh_my_posh ;;
+    10) install_sesh ;;
+    11) install_nvm ;;
+    12) install_alacritty ;;
+    13) install_nerd_fonts ;;
+    14) install_docker ;;
+    15) install_kubernetes_tools ;;
+    16) install_blesh ;;
+    17)
+      install_lazydocker
+      install_k9s
+      ;;
+    18) build_neovim_from_source ;;
+    19) setup_astronvim ;;
+    esac
+  done
 
-    setup_configs
-    install_tmux_plugins
-    create_tool_configs
-    final_setup
-    print_summary
+  setup_configs
+  install_tmux_plugins
+  create_tool_configs
+  final_setup
+  print_summary
 }
 
 # =============================================================================
@@ -2200,29 +2266,29 @@ custom_installation() {
 # =============================================================================
 
 main() {
-    # Check if running as root
-    if [ "$EUID" -eq 0 ]; then
-        error "Do not run this script as root!"
-        exit 1
-    fi
+  # Check if running as root
+  if [ "$EUID" -eq 0 ]; then
+    error "Do not run this script as root!"
+    exit 1
+  fi
 
-    # Check for arguments
-    if [ "$1" = "--full" ]; then
-        full_installation
-    elif [ "$1" = "--minimal" ]; then
-        minimal_installation
-    elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-        echo "Usage: $0 [--full|--minimal|--help]"
-        echo ""
-        echo "  --full     Full installation (all components)"
-        echo "  --minimal  Minimal installation (CLI tools + configs)"
-        echo "  --help     Show this help message"
-        echo ""
-        echo "Run without arguments for interactive menu"
-        exit 0
-    else
-        show_menu
-    fi
+  # Check for arguments
+  if [ "$1" = "--full" ]; then
+    full_installation
+  elif [ "$1" = "--minimal" ]; then
+    minimal_installation
+  elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: $0 [--full|--minimal|--help]"
+    echo ""
+    echo "  --full     Full installation (all components)"
+    echo "  --minimal  Minimal installation (CLI tools + configs)"
+    echo "  --help     Show this help message"
+    echo ""
+    echo "Run without arguments for interactive menu"
+    exit 0
+  else
+    show_menu
+  fi
 }
 
 main "$@"
