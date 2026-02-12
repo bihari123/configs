@@ -139,7 +139,7 @@ fi
 
 eval "$(starship init bash)"
 
-#eval "$(starship init bash)"
+#eval "$(oh-my-posh init bash)"
 . "$HOME/.cargo/env"
 
 export PATH="$HOME/bin:$PATH"
@@ -242,3 +242,4 @@ export XDG_DATA_DIRS="/var/lib/flatpak/exports/share:/home/tarun/.local/share/fl
 export NVM_DIR="$HOME/.config/nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+export PATH="$HOME/bin:$PATH"

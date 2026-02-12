@@ -301,82 +301,100 @@ install_binary_tools() {
   mkdir -p ~/.local/bin
 
   # Install duf (Go)
-  DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  # Try multiple methods to get version
+  DUF_VERSION=$(curl -s https://api.github.com/repos/muesli/duf/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
+  # Fallback: try to get from GitHub tags API
   if [ -z "$DUF_VERSION" ]; then
-    warning "Could not fetch duf version from GitHub API, skipping..."
-  else
-    if command_exists duf; then
-      CURRENT_VERSION=$(duf --version 2>/dev/null | grep -oP 'duf version \K[0-9.]+' || echo "unknown")
-      if [ "$CURRENT_VERSION" = "$DUF_VERSION" ]; then
-        info "duf already at latest version: $CURRENT_VERSION"
-      else
-        info "Updating duf from $CURRENT_VERSION to $DUF_VERSION..."
-        if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
-          tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
-          if [ -f /tmp/duf ]; then
-            mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
-            chmod +x ~/.local/bin/duf 2>/dev/null || true
-            success "duf updated to $DUF_VERSION"
-          fi
-          rm -f /tmp/duf.tar.gz
-        else
-          warning "Failed to download duf, skipping..."
-        fi
-      fi
+    DUF_VERSION=$(curl -s "https://api.github.com/repos/muesli/duf/tags" 2>/dev/null | grep -m1 '"name":' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  fi
+
+  # Hardcoded fallback if API fails completely
+  if [ -z "$DUF_VERSION" ]; then
+    DUF_VERSION="0.8.1"
+  fi
+
+  info "Installing duf v${DUF_VERSION}..."
+
+  if command_exists duf; then
+    CURRENT_VERSION=$(duf --version 2>/dev/null | grep -oP 'duf version \K[0-9.]+' || echo "unknown")
+    if [ "$CURRENT_VERSION" = "$DUF_VERSION" ]; then
+      info "duf already at latest version: $CURRENT_VERSION"
     else
-      info "Installing duf..."
-      if wget -q "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
+      info "Updating duf from $CURRENT_VERSION to $DUF_VERSION..."
+      if wget -q --show-progress "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
         tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
         if [ -f /tmp/duf ]; then
           mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
           chmod +x ~/.local/bin/duf 2>/dev/null || true
-          success "duf installed"
+          success "duf updated to $DUF_VERSION"
         fi
         rm -f /tmp/duf.tar.gz
       else
         warning "Failed to download duf, skipping..."
       fi
     fi
+  else
+    info "Installing duf..."
+    if wget -q --show-progress "https://github.com/muesli/duf/releases/download/v${DUF_VERSION}/duf_${DUF_VERSION}_linux_amd64.tar.gz" -O /tmp/duf.tar.gz 2>/dev/null; then
+      tar xzf /tmp/duf.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract duf"
+      if [ -f /tmp/duf ]; then
+        mv /tmp/duf ~/.local/bin/ 2>/dev/null || warning "Failed to move duf"
+        chmod +x ~/.local/bin/duf 2>/dev/null || true
+        success "duf installed"
+      fi
+      rm -f /tmp/duf.tar.gz
+    else
+      warning "Failed to download duf, skipping..."
+    fi
   fi
 
   # Install lazygit
-  LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  # Try multiple methods to get version
+  LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
+  # Fallback: try to get from GitHub tags API
   if [ -z "$LAZYGIT_VERSION" ]; then
-    warning "Could not fetch lazygit version from GitHub API, skipping..."
-  else
-    if command_exists lazygit; then
-      CURRENT_VERSION=$(lazygit --version 2>/dev/null | grep -oP 'version=\K[0-9.]+' || echo "unknown")
-      if [ "$CURRENT_VERSION" = "$LAZYGIT_VERSION" ]; then
-        info "lazygit already at latest version: $CURRENT_VERSION"
-      else
-        info "Updating lazygit from $CURRENT_VERSION to $LAZYGIT_VERSION..."
-        if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
-          tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
-          if [ -f /tmp/lazygit ]; then
-            mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
-            chmod +x ~/.local/bin/lazygit 2>/dev/null || true
-            success "lazygit updated to $LAZYGIT_VERSION"
-          fi
-          rm -f /tmp/lazygit.tar.gz
-        else
-          warning "Failed to download lazygit, skipping..."
-        fi
-      fi
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/tags" 2>/dev/null | grep -m1 '"name":' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  fi
+
+  # Hardcoded fallback if API fails completely
+  if [ -z "$LAZYGIT_VERSION" ]; then
+    LAZYGIT_VERSION="0.44.1"
+  fi
+
+  info "Installing lazygit v${LAZYGIT_VERSION}..."
+
+  if command_exists lazygit; then
+    CURRENT_VERSION=$(lazygit --version 2>/dev/null | grep -oP 'version=\K[0-9.]+' || echo "unknown")
+    if [ "$CURRENT_VERSION" = "$LAZYGIT_VERSION" ]; then
+      info "lazygit already at latest version: $CURRENT_VERSION"
     else
-      info "Installing lazygit..."
-      if wget -q "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
+      info "Updating lazygit from $CURRENT_VERSION to $LAZYGIT_VERSION..."
+      if wget -q --show-progress "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
         tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
         if [ -f /tmp/lazygit ]; then
           mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
           chmod +x ~/.local/bin/lazygit 2>/dev/null || true
-          success "lazygit installed"
+          success "lazygit updated to $LAZYGIT_VERSION"
         fi
         rm -f /tmp/lazygit.tar.gz
       else
         warning "Failed to download lazygit, skipping..."
       fi
+    fi
+  else
+    info "Installing lazygit..."
+    if wget -q --show-progress "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" -O /tmp/lazygit.tar.gz 2>/dev/null; then
+      tar xzf /tmp/lazygit.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract lazygit"
+      if [ -f /tmp/lazygit ]; then
+        mv /tmp/lazygit ~/.local/bin/ 2>/dev/null || warning "Failed to move lazygit"
+        chmod +x ~/.local/bin/lazygit 2>/dev/null || true
+        success "lazygit installed"
+      fi
+      rm -f /tmp/lazygit.tar.gz
+    else
+      warning "Failed to download lazygit, skipping..."
     fi
   fi
 
@@ -402,18 +420,57 @@ install_zoxide() {
 }
 
 # =============================================================================
-# Install Oh My Posh
+# Install Starship
 # =============================================================================
 
-install_oh_my_posh() {
-  step "Installing oh-my-posh"
+install_starship() {
+  step "Installing starship"
 
-  if command_exists oh-my-posh; then
-    info "oh-my-posh already installed, checking for updates..."
-    oh-my-posh upgrade 2>/dev/null || info "oh-my-posh is up to date"
+  if command_exists starship; then
+    info "starship already installed"
+    # Starship updates via package manager or reinstall
+    return
+  fi
+
+  info "Installing starship..."
+
+  # Detect architecture
+  ARCH=$(uname -m)
+  case $ARCH in
+  x86_64) ARCH="x86_64" ;;
+  aarch64) ARCH="arm64" ;;
+  armv7l) ARCH="armv7" ;;
+  *)
+    warning "Unsupported architecture: $ARCH, skipping starship"
+    return 0
+    ;;
+  esac
+
+  # Get latest version
+  STARSHIP_VERSION=$(curl -s https://api.github.com/repos/starship/starship/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+
+  if [ -z "$STARSHIP_VERSION" ]; then
+    warning "Could not fetch starship version from GitHub API, skipping..."
+    return 0
+  fi
+
+  # Download and install
+  DOWNLOAD_URL="https://github.com/starship/starship/releases/download/v${STARSHIP_VERSION}/starship-${ARCH}-unknown-linux-gnu.tar.gz"
+  info "Downloading starship v${STARSHIP_VERSION}..."
+
+  if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/starship.tar.gz 2>/dev/null; then
+    tar xzf /tmp/starship.tar.gz -C /tmp 2>/dev/null || warning "Failed to extract starship"
+    if [ -f /tmp/starship ]; then
+      mv /tmp/starship ~/.local/bin/ 2>/dev/null || warning "Failed to move starship"
+      chmod +x ~/.local/bin/starship 2>/dev/null || true
+      rm -f /tmp/starship.tar.gz
+      success "starship installed"
+    else
+      warning "starship installation failed"
+      rm -f /tmp/starship.tar.gz
+    fi
   else
-    curl -s https://ohmyposh.dev/install.sh | bash -s -- -d ~/.local/bin
-    success "oh-my-posh installed"
+    warning "Failed to download starship, skipping..."
   fi
 }
 
@@ -498,6 +555,8 @@ install_golang() {
 
   info "Latest Go version: $GO_VERSION"
 
+  # Check if Go is already installed and at the correct version
+  export PATH="$PATH:$HOME/.local/go/bin"
   if command_exists go; then
     CURRENT_VERSION=$(go version | awk '{print $3}')
     if [ "$CURRENT_VERSION" = "$GO_VERSION" ]; then
@@ -522,13 +581,16 @@ install_golang() {
     ;;
   esac
 
-  # Download and install
+  # Download and install to user directory (no sudo needed)
   DOWNLOAD_URL="https://go.dev/dl/${GO_VERSION}.linux-${ARCH}.tar.gz"
   info "Downloading from: $DOWNLOAD_URL"
 
   if wget -q --show-progress "$DOWNLOAD_URL" -O /tmp/go.tar.gz; then
-    sudo rm -rf /usr/local/go
-    sudo tar -C /usr/local -xzf /tmp/go.tar.gz
+    # Remove old installation if exists
+    rm -rf "$HOME/.local/go"
+    # Extract to ~/.local/go (tar creates the 'go' directory)
+    mkdir -p "$HOME/.local"
+    tar -C "$HOME/.local" -xzf /tmp/go.tar.gz
     rm /tmp/go.tar.gz
   else
     error "Failed to download Go from $DOWNLOAD_URL"
@@ -537,15 +599,15 @@ install_golang() {
   fi
 
   # Add to PATH in bashrc if not already there
-  if ! grep -q "/usr/local/go/bin" ~/.bashrc; then
-    echo 'export PATH=$PATH:/usr/local/go/bin' >>~/.bashrc
+  if ! grep -q "\$HOME/.local/go/bin" ~/.bashrc; then
+    echo 'export PATH=$PATH:$HOME/.local/go/bin' >>~/.bashrc
   fi
 
   if ! grep -q '$HOME/go/bin' ~/.bashrc; then
     echo 'export PATH=$PATH:$HOME/go/bin' >>~/.bashrc
   fi
 
-  export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+  export PATH=$PATH:$HOME/.local/go/bin:$HOME/go/bin
 
   success "Golang installed: $GO_VERSION"
 }
@@ -670,29 +732,28 @@ install_alacritty() {
 
     info "Building Alacritty (this may take a few minutes)..."
     if cargo build --release; then
-      # Install binary
-      sudo cp target/release/alacritty /usr/local/bin
-      sudo chmod +x /usr/local/bin/alacritty
+      # Install binary to ~/.local/bin (no sudo needed)
+      mkdir -p ~/.local/bin
+      cp target/release/alacritty ~/.local/bin/
+      chmod +x ~/.local/bin/alacritty
 
       # Install desktop entry (optional)
       if [ ! -f ~/.local/share/applications/Alacritty.desktop ]; then
         mkdir -p ~/.local/share/applications
-        sudo cp extra/logo/alacritty-term.svg /usr/share/icons/hicolor/scalable/apps/Alacritty.svg 2>/dev/null || true
         sed -e 's/Icon=alacritty/Icon=Alacritty/g' extra/linux/Alacritty.desktop >~/.local/share/applications/Alacritty.desktop 2>/dev/null || true
       fi
 
-      # Install man page
-      sudo mkdir -p /usr/local/share/man/man1
+      # Install man page to ~/.local/share/man
+      mkdir -p ~/.local/share/man/man1
       sed -e "s/%VERSION%/$(grep '^version =' Cargo.toml | head -n1 | awk '{print $3}' | tr -d '"')/g" extra/alacritty.man |
-        gzip -c |
-        sudo tee /usr/local/share/man/man1/alacritty.1.gz >/dev/null
+        gzip -c >~/.local/share/man/man1/alacritty.1.gz
 
       # Install terminfo file for proper terminal functionality
       info "Installing terminfo entries..."
-      sudo tic -xe alacritty,alacritty-direct extra/alacritty.info
+      tic -xe alacritty,alacritty-direct extra/alacritty.info 2>/dev/null || warning "terminfo install failed (non-fatal)"
 
       cd / && rm -rf "$TMP"
-      success "Alacritty installed from source"
+      success "Alacritty installed from source to ~/.local/bin/alacritty"
     else
       error "Failed to build Alacritty"
       cd / && rm -rf "$TMP"
@@ -917,24 +978,28 @@ install_cpp_build_tools() {
       ca-certificates
 
     ############################################
-    # LLVM 18 (official binaries → /opt)
+    # LLVM 19 (official binaries → /opt)
     ############################################
-    LLVM_VERSION="18.1.8"
-    LLVM_DIR="/opt/llvm-18"
+    LLVM_VERSION="19.1.0"
+    LLVM_DIR="/opt/llvm-19"
 
     if [ ! -d "$LLVM_DIR" ]; then
       echo "[*] Installing LLVM ${LLVM_VERSION}"
       TMP=$(mktemp -d)
       cd "$TMP"
 
-      wget -q https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
-      sudo tar -C /opt -xf clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04.tar.xz
-      sudo mv /opt/clang+llvm-${LLVM_VERSION}-x86_64-linux-gnu-ubuntu-22.04 "$LLVM_DIR"
+      info "Downloading LLVM ${LLVM_VERSION} (~800MB)..."
+      wget --show-progress https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/LLVM-${LLVM_VERSION}-Linux-X64.tar.xz
+      info "Extracting LLVM to /opt (this may take a minute)..."
+      sudo mkdir -p /opt
+      sudo tar -C /opt -xf LLVM-${LLVM_VERSION}-Linux-X64.tar.xz
+      sudo mv /opt/LLVM-${LLVM_VERSION}-Linux-X64 "$LLVM_DIR"
 
       cd /
       rm -rf "$TMP"
+      success "LLVM ${LLVM_VERSION} installed"
     else
-      echo "[*] LLVM 18 already installed"
+      echo "[*] LLVM ${LLVM_VERSION} already installed"
     fi
 
     ############################################
@@ -944,7 +1009,8 @@ install_cpp_build_tools() {
     GCC_DIR="/opt/gcc-14"
 
     if [ ! -d "$GCC_DIR" ]; then
-      echo "[*] Building GCC ${GCC_VERSION} (this takes time)"
+      echo "[*] Building GCC ${GCC_VERSION} (this takes time - can be 1-2 hours)"
+      warning "Building GCC from source - this will take 1-2 hours depending on your CPU"
       sudo apt install -y \
         libgmp-dev \
         libmpfr-dev \
@@ -955,20 +1021,25 @@ install_cpp_build_tools() {
       TMP=$(mktemp -d)
       cd "$TMP"
 
-      wget -q https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
+      info "Downloading GCC ${GCC_VERSION} source (~140MB)..."
+      wget --show-progress https://ftp.gnu.org/gnu/gcc/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz
+      info "Extracting GCC source..."
       tar xf gcc-${GCC_VERSION}.tar.xz
       cd gcc-${GCC_VERSION}
 
+      info "Configuring GCC build..."
       ./configure \
         --prefix="$GCC_DIR" \
         --disable-multilib \
         --enable-languages=c,c++
 
+      info "Building GCC (this will take 1-2 hours, using $(nproc) cores)..."
       make -j"$(nproc)"
       sudo make install
 
       cd /
       rm -rf "$TMP"
+      success "GCC ${GCC_VERSION} built and installed"
     else
       echo "[*] GCC 14 already installed"
     fi
@@ -980,7 +1051,7 @@ install_cpp_build_tools() {
 
     ENV_FILE="/etc/profile.d/toolchains.sh"
 
-    append_if_missing 'export PATH=/opt/llvm-18/bin:/opt/gcc-14/bin:$PATH' "$ENV_FILE"
+    append_if_missing 'export PATH=/opt/llvm-19/bin:/opt/gcc-14/bin:$PATH' "$ENV_FILE"
     append_if_missing 'export CC=clang' "$ENV_FILE"
     append_if_missing 'export CXX=clang++' "$ENV_FILE"
 
@@ -1272,25 +1343,11 @@ install_rust_utilities() {
 build_neovim_from_source() {
   step "Building Neovim from source"
 
-  # Check if nvim is already installed and up-to-date
+  # Check if nvim is already installed
   if command_exists nvim; then
-    CURRENT_COMMIT=$(nvim --version | head -1 | grep -oP 'NVIM v[0-9.]+-dev-\K[0-9]+' || echo "")
-
-    # Fetch latest stable commit without cloning
-    LATEST_COMMIT=$(git ls-remote https://github.com/neovim/neovim refs/heads/stable | cut -f1 | cut -c1-7)
-
-    if [ -n "$CURRENT_COMMIT" ] && [ -n "$LATEST_COMMIT" ]; then
-      info "Current Neovim commit: $CURRENT_COMMIT, Latest stable: $LATEST_COMMIT"
-      # For stable releases, just check if nvim exists with recent version
-      CURRENT_VERSION=$(nvim --version | head -1 | grep -oP 'NVIM v\K[0-9.]+' || echo "0.0.0")
-      info "Neovim already installed: v$CURRENT_VERSION"
-
-      read -p "Rebuild Neovim from latest stable? (y/N): " rebuild
-      if [[ ! "$rebuild" =~ ^[Yy]$ ]]; then
-        info "Skipping Neovim build"
-        return
-      fi
-    fi
+    CURRENT_VERSION=$(nvim --version | head -1 | grep -oP 'NVIM v\K[0-9.]+' || echo "unknown")
+    info "Neovim already installed: v$CURRENT_VERSION, skipping build"
+    return
   fi
 
   # Install build dependencies
@@ -1375,7 +1432,11 @@ build_neovim_from_source() {
 
   info "Building Neovim (this will take several minutes)..."
   make CMAKE_BUILD_TYPE=RelWithDebInfo
-  cd build && cpack -G DEB && sudo dpkg -i nvim-linux-x86_64.deb
+
+  info "Installing Neovim to ~/.local/bin..."
+  mkdir -p ~/.local/bin
+  cp build/bin/nvim ~/.local/bin/
+  chmod +x ~/.local/bin/nvim
 
   # Cleanup
   cd - >/dev/null
@@ -1521,21 +1582,7 @@ install_kubernetes_tools() {
   else
     if command_exists kubectl; then
       CURRENT_VERSION="v$(kubectl version --client -o json 2>/dev/null | grep -oP '"gitVersion":\s*"\K[^"]+' || echo "unknown")"
-      if [ "$CURRENT_VERSION" = "$KUBECTL_VERSION" ]; then
-        info "kubectl already at latest version: $CURRENT_VERSION"
-      else
-        info "Updating kubectl from $CURRENT_VERSION to $KUBECTL_VERSION..."
-        if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
-          chmod +x kubectl 2>/dev/null || true
-          mv kubectl ~/.local/bin/ 2>/dev/null || {
-            warning "Failed to update kubectl"
-            rm -f kubectl
-          }
-          success "kubectl updated to $KUBECTL_VERSION"
-        else
-          warning "Failed to download kubectl, skipping..."
-        fi
-      fi
+      info "kubectl already installed: $CURRENT_VERSION, skipping update"
     else
       info "Installing kubectl..."
       if curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" 2>/dev/null; then
@@ -1558,8 +1605,7 @@ install_kubernetes_tools() {
   # Install helm
   if command_exists helm; then
     CURRENT_HELM=$(helm version --template='{{.Version}}' 2>/dev/null | sed 's/v//' || echo "unknown")
-    info "helm already installed: v$CURRENT_HELM"
-    info "Use 'helm repo update' to update repositories"
+    info "helm already installed: v$CURRENT_HELM, skipping update"
   else
     info "Installing helm..."
     if curl -s https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 2>/dev/null | bash 2>/dev/null; then
@@ -1572,8 +1618,7 @@ install_kubernetes_tools() {
   # Install minikube
   if command_exists minikube; then
     CURRENT_MINIKUBE=$(minikube version --short 2>/dev/null | sed 's/v//' || echo "unknown")
-    info "minikube already installed: v$CURRENT_MINIKUBE"
-    info "Use 'minikube update-check' to check for updates"
+    info "minikube already installed: v$CURRENT_MINIKUBE, skipping update"
   else
     info "Installing minikube..."
     if curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 2>/dev/null; then
@@ -1612,21 +1657,7 @@ install_kubernetes_tools() {
   else
     if command_exists kind; then
       CURRENT_KIND=$(kind version 2>/dev/null | grep -oP 'kind v\K[0-9.]+' || echo "unknown")
-      if [ "$CURRENT_KIND" = "$KIND_VERSION" ]; then
-        info "kind already at latest version: $CURRENT_KIND"
-      else
-        info "Updating kind from $CURRENT_KIND to $KIND_VERSION..."
-        if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
-          chmod +x ./kind 2>/dev/null || true
-          mv ./kind ~/.local/bin/kind 2>/dev/null || {
-            warning "Failed to update kind"
-            rm -f kind
-          }
-          success "kind updated to $KIND_VERSION"
-        else
-          warning "Failed to download kind, skipping..."
-        fi
-      fi
+      info "kind already installed: $CURRENT_KIND, skipping update"
     else
       info "Installing kind..."
       if curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v${KIND_VERSION}/kind-linux-${ARCH}" 2>/dev/null; then
@@ -1748,21 +1779,22 @@ install_lazydocker() {
     ;;
   esac
 
-  LATEST_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazydocker/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  LATEST_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazydocker/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
+  # Fallback: try to get from GitHub tags API
   if [ -z "$LATEST_VERSION" ]; then
-    warning "Could not fetch lazydocker version from GitHub API, skipping..."
-    return 0
+    LATEST_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazydocker/tags" 2>/dev/null | grep -m1 '"name":' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  fi
+
+  # Hardcoded fallback if API fails completely
+  if [ -z "$LATEST_VERSION" ]; then
+    LATEST_VERSION="0.23.18"
   fi
 
   if command_exists lazydocker; then
     CURRENT_VERSION=$(lazydocker --version 2>/dev/null | grep -oP 'Version: \K[0-9.]+' || echo "unknown")
-    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-      info "lazydocker already at latest version: $CURRENT_VERSION"
-      return
-    else
-      info "Updating lazydocker from $CURRENT_VERSION to $LATEST_VERSION"
-    fi
+    info "lazydocker already installed: v$CURRENT_VERSION, skipping update"
+    return
   fi
 
   DOWNLOAD_URL="https://github.com/jesseduffield/lazydocker/releases/download/v${LATEST_VERSION}/lazydocker_${LATEST_VERSION}_Linux_${ARCH}.tar.gz"
@@ -1809,21 +1841,22 @@ install_k9s() {
     ;;
   esac
 
-  LATEST_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  LATEST_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
 
+  # Fallback: try to get from GitHub tags API
   if [ -z "$LATEST_VERSION" ]; then
-    warning "Could not fetch k9s version from GitHub API, skipping..."
-    return 0
+    LATEST_VERSION=$(curl -s "https://api.github.com/repos/derailed/k9s/tags" 2>/dev/null | grep -m1 '"name":' | sed -E 's/.*"v([^"]+)".*/\1/' || echo "")
+  fi
+
+  # Hardcoded fallback if API fails completely
+  if [ -z "$LATEST_VERSION" ]; then
+    LATEST_VERSION="0.32.7"
   fi
 
   if command_exists k9s; then
-    CURRENT_VERSION=$(k9s version -s 2>/dev/null | grep -oP 'Version\s+\K[0-9.]+' | head -1 || echo "unknown")
-    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-      info "k9s already at latest version: $CURRENT_VERSION"
-      return
-    else
-      info "Updating k9s from $CURRENT_VERSION to $LATEST_VERSION"
-    fi
+    CURRENT_VERSION=$(k9s version -s 2>/dev/null | grep -m1 '^Version' | awk '{print $2}' || echo "unknown")
+    info "k9s already installed: v$CURRENT_VERSION, skipping update"
+    return
   fi
 
   DOWNLOAD_URL="https://github.com/derailed/k9s/releases/download/v${LATEST_VERSION}/k9s_Linux_${ARCH}.tar.gz"
@@ -1892,9 +1925,7 @@ setup_configs() {
     mkdir -p ~/.config/alacritty
     ln -sf "$SCRIPT_DIR/alacritty/alacritty.toml" ~/.config/alacritty/alacritty.toml
 
-    # Oh-my-posh theme
-    mkdir -p ~/.config
-    ln -sf "$SCRIPT_DIR/oh-my-posh/dark-colorblind.omp.json" ~/.config/oh-my-posh-dark-colorblind.omp.json
+    # Note: Starship config is ~/.config/starship.toml (create manually if needed)
 
     # Neovim
     mkdir -p ~/.config/nvim
@@ -2041,7 +2072,7 @@ print_summary() {
   echo -e "  ${GREEN}✓${NC} Video/Audio processing libs"
   echo ""
   echo -e "${MAGENTA}C++ Build Tools (C++23 Support):${NC}"
-  echo -e "  ${GREEN}✓${NC} GCC 13/14 + Clang 18"
+  echo -e "  ${GREEN}✓${NC} GCC 14 + LLVM/Clang 19"
   echo -e "  ${GREEN}✓${NC} CMake, Ninja, Meson"
   echo -e "  ${GREEN}✓${NC} vcpkg (C++ package manager)"
   echo -e "  ${GREEN}✓${NC} Boost, Eigen, fmt, spdlog"
@@ -2068,7 +2099,7 @@ print_summary() {
   echo ""
   echo -e "${MAGENTA}Shell Enhancements:${NC}"
   echo -e "  ${GREEN}✓${NC} ble.sh (auto-suggestions & syntax highlighting)"
-  echo -e "  ${GREEN}✓${NC} oh-my-posh (beautiful prompt)"
+  echo -e "  ${GREEN}✓${NC} starship (beautiful prompt)"
   echo -e "  ${GREEN}✓${NC} zoxide (smart directory jumper)"
   echo ""
   echo -e "${MAGENTA}Rust Utilities:${NC}"
@@ -2158,15 +2189,15 @@ show_menu() {
 full_installation() {
   detect_distro
   install_base_packages
+  install_golang
   install_modern_cli_tools
   install_multimedia_tools
   install_cpp_build_tools
   install_python_dev_tools
-  install_golang
   install_vcpkg
   install_rust_utilities
   install_zoxide
-  install_oh_my_posh
+  install_starship
   install_sesh
   install_nvm
   install_alacritty
@@ -2188,9 +2219,10 @@ full_installation() {
 minimal_installation() {
   detect_distro
   install_base_packages
+  install_golang
   install_modern_cli_tools
   install_zoxide
-  install_oh_my_posh
+  install_starship
   install_sesh
   install_blesh
   setup_configs
@@ -2213,7 +2245,7 @@ custom_installation() {
   echo "   6) vcpkg (C++ package manager)"
   echo "   7) Rust utilities (cargo tools, zellij, etc.)"
   echo "   8) Zoxide (smart cd)"
-  echo "   9) Oh-my-posh (prompt)"
+  echo "   9) Starship (prompt)"
   echo "  10) Sesh (tmux session manager)"
   echo "  11) NVM (Node Version Manager)"
   echo "  12) Alacritty (terminal emulator)"
@@ -2229,7 +2261,11 @@ custom_installation() {
 
   for comp in "${components[@]}"; do
     case $comp in
-    1) install_modern_cli_tools ;;
+    1)
+      # Modern CLI tools requires Golang for sesh
+      install_golang
+      install_modern_cli_tools
+      ;;
     2) install_multimedia_tools ;;
     3) install_cpp_build_tools ;;
     4) install_python_dev_tools ;;
@@ -2237,7 +2273,7 @@ custom_installation() {
     6) install_vcpkg ;;
     7) install_rust_utilities ;;
     8) install_zoxide ;;
-    9) install_oh_my_posh ;;
+    9) install_starship ;;
     10) install_sesh ;;
     11) install_nvm ;;
     12) install_alacritty ;;
