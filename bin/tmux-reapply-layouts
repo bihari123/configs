@@ -1,0 +1,28 @@
+#!/bin/bash
+# Reapply saved window layouts after tmux-resurrect restore.
+# Resurrect's select-layout can fail when terminal dimensions differ from
+# the save-time dimensions because the layout checksum encodes size.
+# Running select-layout again after everything has settled works around this.
+
+RESURRECT_DIR="$HOME/.tmux/resurrect"
+LAST_SAVE=$(readlink "$RESURRECT_DIR/last" 2>/dev/null)
+if [ -z "$LAST_SAVE" ]; then
+    LAST_SAVE=$(ls -t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null | head -1)
+else
+    LAST_SAVE="$RESURRECT_DIR/$LAST_SAVE"
+fi
+
+if [ -z "$LAST_SAVE" ] || [ ! -f "$LAST_SAVE" ]; then
+    exit 0
+fi
+
+sleep 1
+
+while IFS=$'\t' read -r line_type session_name window_number window_name window_active window_flags window_layout _rest; do
+    if [ "$line_type" != "window" ]; then
+        continue
+    fi
+    if tmux list-windows -t "$session_name" -F "#{window_index}" 2>/dev/null | grep -q "^${window_number}$"; then
+        tmux select-layout -t "${session_name}:${window_number}" "$window_layout" 2>/dev/null
+    fi
+done < "$LAST_SAVE"
