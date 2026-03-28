@@ -1,0 +1,12 @@
+[submodule "tmux/plugins/tmux-logger"]
+	path = tmux/plugins/tmux-logger
+	url = https://github.com/bihari123/tmux-logger.git
+[submodule "tmux/plugins/tmux-ui"]
+	path = tmux/plugins/tmux-ui
+	url = https://github.com/bihari123/tmux-ui.git
+[submodule "tmux/plugins/tmux-quick-ssh"]
+	path = tmux/plugins/tmux-quick-ssh
+	url = https://github.com/bihari123/tmux-quick-ssh.git
+[submodule "tmux/plugins/tmux-scratch"]
+	path = tmux/plugins/tmux-scratch
+	url = https://github.com/bihari123/tmux-scratch.git

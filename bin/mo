@@ -124,7 +124,7 @@ install_to_system() {
 }
 
 # Quick switch mode (for command line arguments) - check early to skip interactive setup
-if [ "$1" = "dim" ] || [ "$1" = "dark" ] || [ "$1" = "lit" ] || [ "$1" = "light" ] || [ "$1" = "status" ]; then
+if [ "$1" = "dim" ] || [ "$1" = "dark" ] || [ "$1" = "lit" ] || [ "$1" = "light" ] || [ "$1" = "medium" ] || [ "$1" = "med" ] || [ "$1" = "status" ]; then
     # For quick commands, just check dependencies silently
     if ! command -v ddcutil &> /dev/null; then
         echo -e "${RED}Error: ddcutil not installed. Please run 'mo' without arguments to install dependencies.${NC}"
@@ -137,6 +137,7 @@ elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  $0          - Interactive mode"
     echo "  $0 dim      - Quick switch to dim room settings"
     echo "  $0 dark     - Quick switch to dark room settings"
+    echo "  $0 medium   - Quick switch to medium settings (dark profile + 35% brightness)"
     echo "  $0 lit      - Quick switch to lit room settings"
     echo "  $0 status   - Show current settings"
     echo "  $0 --help   - Show this help"
@@ -206,6 +207,28 @@ apply_dim_room() {
     fi
 
     echo -e "${GREEN}Dim room settings applied!${NC}"
+}
+
+# Function to apply medium settings (dark profile + mid brightness for afternoon daylight)
+apply_medium() {
+    echo -e "\n${YELLOW}Applying medium settings (afternoon daylight)...${NC}"
+    echo "  Brightness: 35%"
+    echo "  Contrast: 75%"
+
+    for display in $DISPLAYS; do
+        echo -e "  ${BLUE}Configuring Display $display...${NC}"
+        ddcutil setvcp 10 35 --display $display 2>/dev/null || true
+        ddcutil setvcp 12 75 --display $display 2>/dev/null || true
+    done
+
+    # Apply redshift if available (same as dark profile)
+    if command -v redshift &> /dev/null; then
+        echo -e "  ${BLUE}Applying blue light filter (4500K)...${NC}"
+        killall redshift 2>/dev/null || true
+        redshift -P -O 4500 -b 0.7 -m randr &>/dev/null
+    fi
+
+    echo -e "${GREEN}Medium settings applied!${NC}"
 }
 
 # Function to apply lit room settings
@@ -278,6 +301,8 @@ main_menu() {
                 apply_dim_room
             elif [ "$PROFILE" = "dark" ]; then
                 apply_dark_room
+            elif [ "$PROFILE" = "medium" ]; then
+                apply_medium
             else
                 apply_lit_room
             fi
@@ -289,12 +314,13 @@ main_menu() {
     echo -e "\n${YELLOW}Select your environment:${NC}"
     echo "1) Dark room (very low light)"
     echo "2) Dim room (low light)"
-    echo "3) Well-lit room"
-    echo "4) Show current settings"
-    echo "5) Exit"
+    echo "3) Medium (afternoon daylight through window)"
+    echo "4) Well-lit room"
+    echo "5) Show current settings"
+    echo "6) Exit"
     echo
-    read -p "Enter your choice (1-5): " choice
-    
+    read -p "Enter your choice (1-6): " choice
+
     case $choice in
         1)
             apply_dark_room
@@ -305,16 +331,20 @@ main_menu() {
             save_profile "dim"
             ;;
         3)
+            apply_medium
+            save_profile "medium"
+            ;;
+        4)
             apply_lit_room
             save_profile "lit"
             ;;
-        4)
+        5)
             show_current
             echo -e "\nPress any key to continue..."
             read -n 1
             main_menu
             ;;
-        5)
+        6)
             echo -e "${GREEN}Goodbye!${NC}"
             exit 0
             ;;
@@ -338,6 +368,12 @@ case "$1" in
         detect_displays > /dev/null 2>&1
         apply_dim_room
         save_profile "dim"
+        exit 0
+        ;;
+    medium|med)
+        detect_displays > /dev/null 2>&1
+        apply_medium
+        save_profile "medium"
         exit 0
         ;;
     lit|light)

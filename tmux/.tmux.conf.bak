@@ -32,7 +32,6 @@ run-shell "$HOME/configs/tmux/plugins/tmux-logger/logger.tmux"
 run-shell "$HOME/configs/tmux/plugins/tmux-ui/ui.tmux"
 run-shell "$HOME/configs/tmux/plugins/tmux-quick-ssh/quick-ssh.tmux"
 run-shell "$HOME/configs/tmux/plugins/tmux-scratch/scratch.tmux"
-run-shell "$HOME/configs/tmux/plugins/tmux-pomodoro/pomodoro.tmux"
 
 # Initialize TPM (keep at bottom)
 run '~/.tmux/plugins/tpm/tpm'

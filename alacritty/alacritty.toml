@@ -76,5 +76,6 @@ mods = "Shift"
 chars = "\u001b[13;2u"
 
 [[keyboard.bindings]]
-key = "F11"
+key = "F"
+mods = "Control|Shift"
 action = "ToggleFullscreen"
