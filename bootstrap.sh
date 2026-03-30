@@ -126,11 +126,14 @@ install_base_packages() {
       procps \
       pkg-config \
       libssl-dev \
-      software-properties-common \
       apt-transport-https \
       ca-certificates \
       gnupg \
       lsb-release
+
+    # software-properties-common is Ubuntu-specific for PPA support
+    # On Debian, this may not exist or be named differently
+    sudo apt install -y software-properties-common 2>/dev/null || true
     ;;
   pacman)
     $PKG_INSTALL \
@@ -670,6 +673,7 @@ install_alacritty() {
   info "Installing Alacritty build dependencies..."
   case "$PKG_MANAGER" in
   apt)
+    # Core dependencies (always available)
     $PKG_INSTALL \
       cmake \
       g++ \
@@ -677,14 +681,22 @@ install_alacritty() {
       python3 \
       libfreetype6-dev \
       libfontconfig1-dev \
-      libxcb-xfixes0-dev \
       libxkbcommon-dev \
       zlib1g-dev \
       libssl-dev \
       libx11-dev \
-      libx11-xcb-dev \
-      libxcb-dri3-dev \
-      libxcb-cursor-dev || true
+      libx11-xcb-dev || true
+
+    # Optional X11/libxcb dependencies (may not be available on all Debian versions)
+    local optional_packages=(
+      "libxcb-xfixes0-dev"
+      "libxcb-dri3-dev"
+      "libxcb-cursor-dev"
+    )
+
+    for pkg in "${optional_packages[@]}"; do
+      sudo apt install -y "$pkg" 2>/dev/null || info "Package $pkg not available, skipping..."
+    done
     ;;
   pacman)
     $PKG_INSTALL \
@@ -839,6 +851,7 @@ install_multimedia_tools() {
 
   case "$PKG_MANAGER" in
   apt)
+    # Core multimedia packages (always available)
     $PKG_INSTALL \
       ffmpeg \
       libavcodec-dev \
@@ -846,28 +859,36 @@ install_multimedia_tools() {
       libavutil-dev \
       libswscale-dev \
       libswresample-dev \
-      libavfilter-dev \
-      libavdevice-dev \
       v4l-utils \
       libv4l-dev \
       libopus-dev \
       libvpx-dev \
       libx264-dev \
       libx265-dev \
-      libaom-dev \
-      libdav1d-dev \
       libmp3lame-dev \
       libvorbis-dev \
       libtheora-dev \
-      libass-dev \
       libfreetype6-dev \
       libfontconfig1-dev \
       libfribidi-dev \
       yasm \
       nasm \
       libsrtp2-dev \
-      libssl-dev \
-      libwebrtc-audio-processing-dev || true
+      libssl-dev || true
+
+    # Optional packages (may not be available on all Debian versions)
+    local optional_packages=(
+      "libavfilter-dev"
+      "libavdevice-dev"
+      "libaom-dev"
+      "libdav1d-dev"
+      "libass-dev"
+      "libwebrtc-audio-processing-dev"
+    )
+
+    for pkg in "${optional_packages[@]}"; do
+      sudo apt install -y "$pkg" 2>/dev/null || info "Package $pkg not available, skipping..."
+    done
     ;;
   pacman)
     $PKG_INSTALL \
@@ -1355,6 +1376,7 @@ build_neovim_from_source() {
 
   case "$PKG_MANAGER" in
   apt)
+    # Core build dependencies (always available)
     $PKG_INSTALL \
       ninja-build \
       gettext \
@@ -1366,19 +1388,26 @@ build_neovim_from_source() {
       libtool-bin \
       autoconf \
       automake \
-      cmake \
       g++ \
-      pkg-config \
-      doxygen \
-      libluajit-5.1-dev \
-      libunibilium-dev \
-      libmsgpack-dev \
-      libtermkey-dev \
-      libvterm-dev \
-      libutf8proc-dev \
-      luajit \
-      lua5.1 \
-      liblua5.1-dev || true
+      pkg-config || true
+
+    # Optional dependencies (may not be available on all Debian versions)
+    local optional_packages=(
+      "doxygen"
+      "libluajit-5.1-dev"
+      "libunibilium-dev"
+      "libmsgpack-dev"
+      "libtermkey-dev"
+      "libvterm-dev"
+      "libutf8proc-dev"
+      "luajit"
+      "lua5.1"
+      "liblua5.1-dev"
+    )
+
+    for pkg in "${optional_packages[@]}"; do
+      sudo apt install -y "$pkg" 2>/dev/null || info "Package $pkg not available, skipping..."
+    done
     ;;
   pacman)
     $PKG_INSTALL \
@@ -1518,28 +1547,42 @@ install_docker() {
   case "$PKG_MANAGER" in
   apt)
     # Remove old versions
-    sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc | cut -f1)
+    sudo apt remove -y docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc 2>/dev/null || true
 
     # Install Docker
     # Add Docker's official GPG key:
     sudo apt update
-    sudo apt install ca-certificates curl
+    sudo apt install -y ca-certificates curl
     sudo install -m 0755 -d /etc/apt/keyrings
-    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings
+
+    # Detect if Debian or Ubuntu and use appropriate repository
+    . /etc/os-release
+    DOCKER_REPO_BASE=""
+    if [ "$ID" = "debian" ] || [ "$ID_LIKE" = "debian" ]; then
+      DOCKER_REPO_BASE="https://download.docker.com/linux/debian"
+      info "Using Docker repository for Debian ($VERSION_CODENAME)"
+    else
+      DOCKER_REPO_BASE="https://download.docker.com/linux/ubuntu"
+      info "Using Docker repository for Ubuntu (${UBUNTU_CODENAME:-$VERSION_CODENAME})"
+    fi
+
+    # Download GPG key
+    sudo curl -fsSL "$DOCKER_REPO_BASE/gpg" -o /etc/apt/keyrings/docker.asc
     sudo chmod a+r /etc/apt/keyrings/docker.asc
 
     # Add the repository to Apt sources:
     sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
 Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+URIs: $DOCKER_REPO_BASE
+Suites: $VERSION_CODENAME
 Components: stable
 Signed-By: /etc/apt/keyrings/docker.asc
 EOF
 
     sudo apt update
 
-    sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     # Enable and start Docker
     sudo systemctl enable docker
     sudo systemctl start docker
@@ -1555,7 +1598,7 @@ EOF
     ;;
   dnf | yum)
     $PKG_INSTALL dnf-plugins-core
-    sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo ||
+    sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo 2>/dev/null ||
       sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
     $PKG_INSTALL docker-ce docker-ce-cli containerd.io docker-compose-plugin
     sudo systemctl enable docker
@@ -1968,6 +2011,17 @@ install_tmux_plugins() {
     info "Run 'tmux' and press Ctrl+g + I to install tmux plugins"
   else
     info "TPM already installed"
+  fi
+
+  # Create symlinks for XDG plugin path if plugins exist there
+  # TPM on modern systems uses ~/.config/tmux/plugins, but our scripts expect ~/.tmux/plugins
+  if [ -d ~/.config/tmux/plugins ]; then
+    for plugin in tmux-resurrect tmux-continuum tmux-logging tmux-yank tmux-sensible; do
+      if [ -d ~/.config/tmux/plugins/$plugin ] && [ ! -e ~/.tmux/plugins/$plugin ]; then
+        ln -s ~/.config/tmux/plugins/$plugin ~/.tmux/plugins/$plugin
+      fi
+    done
+    success "Created plugin symlinks from ~/.config/tmux/plugins to ~/.tmux/plugins"
   fi
 }
 
