@@ -13,3 +13,6 @@
 [submodule "tmux/plugins/tmux-pomodoro"]
 	path = tmux/plugins/tmux-pomodoro
 	url = https://github.com/bihari123/tmux-pomodoro-minimal.git
+[submodule "tmux/plugins/tmux-vibes"]
+	path = tmux/plugins/tmux-vibes
+	url = https://github.com/bihari123/tmux-vibes.git
