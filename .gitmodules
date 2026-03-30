@@ -10,3 +10,6 @@
 [submodule "tmux/plugins/tmux-scratch"]
 	path = tmux/plugins/tmux-scratch
 	url = https://github.com/bihari123/tmux-scratch.git
+[submodule "tmux/plugins/tmux-pomodoro"]
+	path = tmux/plugins/tmux-pomodoro
+	url = https://github.com/bihari123/tmux-pomodoro-minimal.git
