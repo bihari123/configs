@@ -19,3 +19,6 @@
 [submodule "nvim-config"]
 	path = nvim-config
 	url = https://github.com/bihari123/nvim-config.git
+[submodule "zellij/plugins/tab-bar"]
+	path = zellij/plugins/tab-bar
+	url = https://github.com/bihari123/zj-barename.git
