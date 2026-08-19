@@ -25,3 +25,6 @@
 [submodule "zellij/plugins/status-bar"]
 	path = zellij/plugins/status-bar
 	url = https://github.com/bihari123/zj-quiethints.git
+[submodule "zellij/plugins/zj-tasks"]
+	path = zellij/plugins/zj-tasks
+	url = https://github.com/bihari123/zj-tasks.git
