@@ -22,3 +22,6 @@
 [submodule "zellij/plugins/tab-bar"]
 	path = zellij/plugins/tab-bar
 	url = https://github.com/bihari123/zj-barename.git
+[submodule "zellij/plugins/status-bar"]
+	path = zellij/plugins/status-bar
+	url = https://github.com/bihari123/zj-quiethints.git
