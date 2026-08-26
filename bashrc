@@ -124,7 +124,7 @@ if ! shopt -oq posix; then
   fi
 fi
 # Efficient PATH setup - consolidated exports
-export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/go/bin:$HOME/go/bin:$PATH"
+export PATH="$HOME/bin:$HOME/.local/bin:$HOME/go/bin:$PATH"
 # Start prompt at the bottom of terminal (only when not in tmux) - disabled for speed
 # if [ -z "$TMUX" ]; then
 #     printf '\033[2J\033[999B'
@@ -144,7 +144,6 @@ eval "$(starship init bash)"
 #eval "$(oh-my-posh init bash)"
 . "$HOME/.cargo/env"
 
-export PATH="$HOME/bin:$PATH"
 export VCPKG_ROOT=~/vcpkg
 
 # ============================================================================
@@ -167,6 +166,14 @@ export EDITOR=nvim
 export VISUAL=nvim
 export PAGER=less
 export LESS='-R -M --shift 5'
+
+# C++ default standard: C++23 (g++ 14 / clang++ 19 both support it fully).
+# CXXFLAGS is picked up by make's implicit rules and CMake's initial flags.
+# The aliases make interactive g++/clang++ default to C++23 too; build tools
+# call the real binary (not the alias), and an explicit -std= later overrides.
+export CXXFLAGS="-std=c++23"
+alias g++='g++ -std=c++23'
+alias clang++='clang++ -std=c++23'
 
 # Man pages with bat (when installed)
 export MANPAGER="sh -c 'col -bx | bat -l man -p 2>/dev/null || less'"
@@ -237,26 +244,17 @@ eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 # Final environment variables
 export MY_INSTALL_DIR="$HOME/.local"
-export XDG_DATA_DIRS="/var/lib/flatpak/exports/share:/home/tarun/.local/share/flatpak/exports/share:$XDG_DATA_DIRS"
+export XDG_DATA_DIRS="/var/lib/flatpak/exports/share:$HOME/.local/share/flatpak/exports/share:$XDG_DATA_DIRS"
 
-
-
-export NVM_DIR="$HOME/.config/nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-export PATH="$HOME/bin:$PATH"
-export PATH="$HOME/bin:$PATH"
 export NVM_DIR="$([ -z "${XDG_CONFIG_HOME-}" ] && printf %s "${HOME}/.nvm" || printf %s "${XDG_CONFIG_HOME}/nvm")"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
 [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
-export PATH="$HOME/.local/bin:$PATH"
 
 # The next line updates PATH for the Google Cloud SDK.
-if [ -f '/home/tarun/google-cloud-sdk/path.bash.inc' ]; then . '/home/tarun/google-cloud-sdk/path.bash.inc'; fi
+if [ -f "$HOME/google-cloud-sdk/path.bash.inc" ]; then . "$HOME/google-cloud-sdk/path.bash.inc"; fi
 
 # The next line enables shell command completion for gcloud.
-if [ -f '/home/tarun/google-cloud-sdk/completion.bash.inc' ]; then . '/home/tarun/google-cloud-sdk/completion.bash.inc'; fi
-export PATH=$PATH:/usr/local/go/bin
+if [ -f "$HOME/google-cloud-sdk/completion.bash.inc" ]; then . "$HOME/google-cloud-sdk/completion.bash.inc"; fi

@@ -1953,16 +1953,30 @@ setup_configs() {
     info "Symlinking configuration files..."
 
     # Bash configs
-    ln -sf "$SCRIPT_DIR/bashrc" ~/.bashrc
+    # Append only the custom tail of the repo bashrc (lines 126+: PATH, starship,
+    # zoxide, fzf, pyenv, nvm, functions) into the EXISTING ~/.bashrc. We never
+    # remove or symlink ~/.bashrc: lines 1-125 are stock Debian boilerplate the
+    # system file already has, and a symlink would make the later go/vcpkg/pyenv
+    # PATH appends write back into the tracked repo file. The marker guard keeps
+    # re-runs idempotent so the block is pasted at most once.
+    touch ~/.bashrc
+    if ! grep -q "# >>> configs bashrc >>>" ~/.bashrc; then
+      {
+        printf '\n# >>> configs bashrc >>>\n'
+        sed -n '126,$p' "$SCRIPT_DIR/bashrc"
+        printf '# <<< configs bashrc <<<\n'
+      } >>~/.bashrc
+    fi
     ln -sf "$SCRIPT_DIR/.bash_aliases" ~/.bash_aliases
     ln -sf "$SCRIPT_DIR/.inputrc" ~/.inputrc
 
     # Git config
     ln -sf "$SCRIPT_DIR/.gitconfig" ~/.gitconfig
 
-    # Tmux
+    # Tmux (repo file is tmux/.tmux.conf; link to both classic and XDG paths)
     mkdir -p ~/.config/tmux
-    ln -sf "$SCRIPT_DIR/tmux/tmux.conf" ~/.config/tmux/tmux.conf
+    [ -f "$SCRIPT_DIR/tmux/.tmux.conf" ] && ln -sf "$SCRIPT_DIR/tmux/.tmux.conf" ~/.config/tmux/tmux.conf
+    [ -f "$SCRIPT_DIR/tmux/.tmux.conf" ] && ln -sf "$SCRIPT_DIR/tmux/.tmux.conf" ~/.tmux.conf
 
     # Alacritty
     mkdir -p ~/.config/alacritty
@@ -1970,9 +1984,8 @@ setup_configs() {
 
     # Note: Starship config is ~/.config/starship.toml (create manually if needed)
 
-    # Neovim
-    mkdir -p ~/.config/nvim
-    [ -d "$SCRIPT_DIR/nvim" ] && ln -sf "$SCRIPT_DIR/nvim" ~/.config/nvim
+    # Neovim: intentionally skipped. Manage ~/.config/nvim yourself (the repo's
+    # nvim-config is a submodule); bootstrap does not touch it.
 
     # k9s
     mkdir -p ~/.config/k9s/skins

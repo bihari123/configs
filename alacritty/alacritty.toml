@@ -1,6 +1,3 @@
-[terminal.shell]
-program = "/usr/bin/tmux"
-
 [font]
 size = 8.0
 
