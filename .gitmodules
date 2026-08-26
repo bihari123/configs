@@ -28,3 +28,6 @@
 [submodule "zellij/plugins/zj-tasks"]
 	path = zellij/plugins/zj-tasks
 	url = https://github.com/bihari123/zj-tasks.git
+[submodule "zellij/plugins/zj-pomodoro"]
+	path = zellij/plugins/zj-pomodoro
+	url = https://github.com/bihari123/zj-pomodoro.git
