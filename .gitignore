@@ -8,3 +8,6 @@ lazygit
 # Rust/Cargo
 taskquest/target/
 taskquest/Cargo.lock
+
+# Editor/backup files
+*.bak

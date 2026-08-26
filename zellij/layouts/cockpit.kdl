@@ -1,0 +1,19 @@
+// "cockpit" layout — the customized zellij UI (pick "cockpit" in the session
+// picker). Named "cockpit" (not "default") so it doesn't collide with Zellij's
+// built-in "default" in the welcome-screen layout list. Behavior lives in plugins:
+//   - status-bar -> zj-quiethints (TOP: keyboard shortcut hints)
+//   - tab-bar    -> zj-barename   (BOTTOM: no "Zellij" prefix; session name,
+//                                  tabs, then right-aligned pomodoro + HH:MM)
+// The bars are deliberately swapped from Zellij's usual order: shortcut hints
+// on top, tabs and clock along the bottom.
+// The only thing here is *which* plugins draw the bars — Zellij needs this to load
+// them instead of its built-ins; there are no plugin settings in this file.
+layout {
+    pane size=1 borderless=true {
+        plugin location="file:/home/kyoroto/.config/zellij/plugins/status-bar.wasm"
+    }
+    pane
+    pane size=1 borderless=true {
+        plugin location="file:/home/kyoroto/.config/zellij/plugins/tab-bar.wasm"
+    }
+}
