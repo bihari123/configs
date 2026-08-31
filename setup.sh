@@ -26,6 +26,17 @@ fi
 ln -sf "$SCRIPT_DIR/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"
 echo -e "${GREEN}✓ Tmux configuration linked${NC}"
 
+# Link tmux helper scripts (resurrect wrappers, welcome launcher, etc.)
+# tmux.conf references these at ~/.config/tmux/scripts/. Use -n so an existing
+# symlink isn't dereferenced (which would nest the link inside the target dir).
+if [ -e "$HOME/.config/tmux/scripts" ] && [ ! -L "$HOME/.config/tmux/scripts" ]; then
+    echo "Backing up existing tmux scripts dir to scripts.bak"
+    rm -rf "$HOME/.config/tmux/scripts.bak"
+    mv "$HOME/.config/tmux/scripts" "$HOME/.config/tmux/scripts.bak"
+fi
+ln -sfn "$SCRIPT_DIR/tmux/scripts" "$HOME/.config/tmux/scripts"
+echo -e "${GREEN}✓ Tmux scripts linked${NC}"
+
 # Setup alacritty configuration
 echo -e "${YELLOW}Setting up alacritty configuration...${NC}"
 mkdir -p "$HOME/.config/alacritty"
@@ -72,9 +83,10 @@ if ! echo "$PATH" | grep -q "$HOME/bin"; then
 fi
 
 # Install tmux plugin manager if not present
-if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
+# tmux.conf loads TPM from ~/.config/tmux/plugins/tpm, so install it there.
+if [ ! -d "$HOME/.config/tmux/plugins/tpm" ]; then
     echo -e "${YELLOW}Installing tmux plugin manager...${NC}"
-    git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
+    git clone https://github.com/tmux-plugins/tpm "$HOME/.config/tmux/plugins/tpm"
     echo -e "${GREEN}✓ TPM installed${NC}"
     echo -e "${YELLOW}Remember to press 'prefix + I' in tmux to install plugins${NC}"
 fi
