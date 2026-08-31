@@ -16,13 +16,14 @@ echo -e "${GREEN}Setting up configurations...${NC}"
 # Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Setup tmux configuration
+# Setup tmux configuration (XDG path: ~/.config/tmux/tmux.conf)
 echo -e "${YELLOW}Setting up tmux configuration...${NC}"
-if [ -f "$HOME/.tmux.conf" ]; then
-    echo "Backing up existing .tmux.conf to .tmux.conf.bak"
-    cp "$HOME/.tmux.conf" "$HOME/.tmux.conf.bak"
+mkdir -p "$HOME/.config/tmux"
+if [ -f "$HOME/.config/tmux/tmux.conf" ] && [ ! -L "$HOME/.config/tmux/tmux.conf" ]; then
+    echo "Backing up existing tmux.conf to tmux.conf.bak"
+    cp "$HOME/.config/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf.bak"
 fi
-ln -sf "$SCRIPT_DIR/tmux/tmux.conf" "$HOME/.tmux.conf"
+ln -sf "$SCRIPT_DIR/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"
 echo -e "${GREEN}✓ Tmux configuration linked${NC}"
 
 # Setup alacritty configuration
@@ -34,6 +35,16 @@ if [ -f "$HOME/.config/alacritty/alacritty.toml" ]; then
 fi
 ln -sf "$SCRIPT_DIR/alacritty/alacritty.toml" "$HOME/.config/alacritty/alacritty.toml"
 echo -e "${GREEN}✓ Alacritty configuration linked${NC}"
+
+# Setup kitty configuration
+echo -e "${YELLOW}Setting up kitty configuration...${NC}"
+mkdir -p "$HOME/.config/kitty"
+if [ -f "$HOME/.config/kitty/kitty.conf" ] && [ ! -L "$HOME/.config/kitty/kitty.conf" ]; then
+    echo "Backing up existing kitty.conf to kitty.conf.bak"
+    cp "$HOME/.config/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf.bak"
+fi
+ln -sf "$SCRIPT_DIR/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
+echo -e "${GREEN}✓ Kitty configuration linked${NC}"
 
 # Setup oh-my-posh configuration
 echo -e "${YELLOW}Setting up oh-my-posh configuration...${NC}"
