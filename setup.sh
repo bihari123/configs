@@ -57,6 +57,17 @@ fi
 ln -sf "$SCRIPT_DIR/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
 echo -e "${GREEN}✓ Kitty configuration linked${NC}"
 
+# Setup neovim configuration (AstroNvim). Symlink the whole config dir; use -n so
+# an existing symlink isn't dereferenced into a nested link.
+echo -e "${YELLOW}Setting up neovim configuration...${NC}"
+if [ -e "$HOME/.config/nvim" ] && [ ! -L "$HOME/.config/nvim" ]; then
+    echo "Backing up existing nvim config dir to nvim.bak"
+    rm -rf "$HOME/.config/nvim.bak"
+    mv "$HOME/.config/nvim" "$HOME/.config/nvim.bak"
+fi
+ln -sfn "$SCRIPT_DIR/nvim" "$HOME/.config/nvim"
+echo -e "${GREEN}✓ Neovim configuration linked${NC}"
+
 # Setup oh-my-posh configuration
 echo -e "${YELLOW}Setting up oh-my-posh configuration...${NC}"
 if [ -f "$HOME/.config/oh-my-posh-dark.omp.json" ]; then
