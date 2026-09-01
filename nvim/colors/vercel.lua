@@ -223,7 +223,17 @@ local ts = {
   ["@tag.attribute"]        = { fg = c.blue },
   ["@tag.delimiter"]        = { fg = c.fg_muted },
 
+  -- Headings. A terminal cannot vary glyph size, so hierarchy is carried by
+  -- colour instead: H1/H2 use the bright accents, and later levels step down
+  -- toward the body text. Applies to markdown and typst alike -- the typst
+  -- parser emits @markup.heading.1 .. .6 the same way markdown does.
   ["@markup.heading"]       = { fg = c.blue, bold = true },
+  ["@markup.heading.1"]     = { fg = c.blue, bold = true },
+  ["@markup.heading.2"]     = { fg = c.purple, bold = true },
+  ["@markup.heading.3"]     = { fg = c.teal, bold = true },
+  ["@markup.heading.4"]     = { fg = c.green, bold = true },
+  ["@markup.heading.5"]     = { fg = c.orange, bold = true },
+  ["@markup.heading.6"]     = { fg = c.fg_dim, bold = true },
   ["@markup.strong"]        = { fg = c.fg, bold = true },
   ["@markup.italic"]        = { fg = c.fg, italic = true },
   ["@markup.strikethrough"] = { fg = c.fg_muted, strikethrough = true },
@@ -306,6 +316,19 @@ for g, s in pairs(git) do hl(g, s) end
 
 -- ── Plugin accents (Telescope, Neo-tree, WhichKey, cmp, indent) ────────────
 local plugins = {
+  -- render-markdown.nvim heading bands.
+  -- Its defaults link these to the diff groups (H1Bg=DiffText, H2Bg=DiffAdd,
+  -- H3Bg=DiffChange, H4Bg=DiffDelete), which on this theme paints headings
+  -- green and red for no reason. Use neutral dark bands instead and let the
+  -- level colour come from the foreground, as everywhere else in this theme.
+  -- The band colour is also what the ▄/▀ border rows are drawn in.
+  RenderMarkdownH1Bg     = { fg = c.blue, bg = c.bg_sel, bold = true },
+  RenderMarkdownH2Bg     = { fg = c.purple, bg = c.bg_sel, bold = true },
+  RenderMarkdownH3Bg     = { fg = c.teal, bg = c.bg_hl, bold = true },
+  RenderMarkdownH4Bg     = { fg = c.green, bg = c.bg_hl, bold = true },
+  RenderMarkdownH5Bg     = { fg = c.orange, bg = c.bg_hl, bold = true },
+  RenderMarkdownH6Bg     = { fg = c.fg_dim, bg = c.bg_hl, bold = true },
+
   -- Telescope
   TelescopeNormal        = { fg = c.fg_dim, bg = c.bg_float },
   TelescopeBorder        = { fg = c.border, bg = c.bg_float },
