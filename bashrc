@@ -154,11 +154,6 @@ export VCPKG_ROOT=~/vcpkg
 if [ -n "$TMUX" ]; then
     # Save history immediately after each command
     PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND$'\n'}history -a"
-
-    # Auto-display previous pane content after restore (runs once per pane)
-    if [ -f "$HOME/configs/bin/tmux-auto-restore-content" ]; then
-        "$HOME/configs/bin/tmux-auto-restore-content" >/dev/null 2>&1
-    fi
 fi
 
 # Environment Variables
