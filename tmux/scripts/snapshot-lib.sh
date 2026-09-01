@@ -20,7 +20,13 @@ LOG_TAG="tmux-snapshot"
 # older than SNAPSHOT_MAX_AGE_DAYS. That keeps every session you actually use
 # restorable at its latest state, while one-off sessions age out instead of
 # pinning a file forever.
-SNAPSHOT_MAX_AGE_DAYS="${SNAPSHOT_MAX_AGE_DAYS:-30}"
+#
+# Note the consequence: killing a session does not drop its snapshot. The file
+# is still the newest one holding that name, so it stays pinned - and stays
+# restorable - until it ages out. 15 days is the chosen balance between "a
+# killed session stops cluttering the picker" and "an accidental kill is still
+# recoverable a fortnight later".
+SNAPSHOT_MAX_AGE_DAYS="${SNAPSHOT_MAX_AGE_DAYS:-15}"
 
 # Log to the journal when available, always echo to stderr so interactive runs
 # and `journalctl --user -t tmux-snapshot` both work.
