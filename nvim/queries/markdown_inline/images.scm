@@ -7,9 +7,10 @@
 ;
 ; `image.lang` rather than `injection.language`: snacks picks its transform
 ; with `M.transforms[ctx.lang]` (snacks/image/doc.lua), and `image.lang` is
-; the snacks-specific key it checks first. Using `injection.language` would
-; also work, but it asks treesitter to parse a latex injection, and the
-; latex parser is not installed here.
+; the snacks-specific key it checks first. `injection.language` would work
+; equally well -- this is a private "images" query, not an "injections" one,
+; so neither key affects how treesitter parses anything. `image.lang` is
+; just the more honest name for what it does here.
 ;
 ; The whole `latex_block` is captured as the content, delimiters included --
 ; the same shape as snacks' own typst query. Its latex transform strips the

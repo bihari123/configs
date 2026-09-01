@@ -71,8 +71,19 @@ local markdown_images_query = [[
 local query_patched = false
 local function patch_markdown_query()
   if query_patched then return end
+  -- `query.set` only stores the text; it is parsed lazily on the first
+  -- `query.get`, which happens deep inside snacks while scanning a buffer.
+  -- Parse it here so a malformed query surfaces as a clear message instead of
+  -- an opaque error from snacks (and so we leave snacks' own query in place
+  -- rather than installing a broken one).
+  local ok, err = pcall(vim.treesitter.query.parse, "markdown", markdown_images_query)
+  if not ok then
+    vim.notify("snacks.image: markdown math query failed to parse: " .. tostring(err), vim.log.levels.ERROR)
+    query_patched = true -- don't retry on every doc buffer
+    return
+  end
+  vim.treesitter.query.set("markdown", "images", markdown_images_query)
   query_patched = true
-  pcall(vim.treesitter.query.set, "markdown", "images", markdown_images_query)
 end
 
 ---@type LazySpec
