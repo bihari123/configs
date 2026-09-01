@@ -12,6 +12,26 @@
 -- setup ourselves on the first doc FileType and attaching the current buffer
 -- with its real bufnr (attach(0) breaks snacks' win_findbuf lookup).
 
+-- Filetypes snacks.image treats as "documents" (the ones its queries cover).
+local doc_filetypes = { "markdown", "typst", "tex", "latex", "html", "norg", "markdown_inline" }
+
+local is_doc_filetype = {}
+for _, ft in ipairs(doc_filetypes) do
+  is_doc_filetype[ft] = true
+end
+
+-- snacks places conceal extmarks over math expressions (see its `doc.conceal`
+-- default), but Neovim ignores conceal extmarks while `conceallevel` is 0 —
+-- which is the default in these buffers. Without this the rendered image is
+-- drawn over the start of the line and the raw source trails off to the right.
+-- `conceallevel` is window-local, so this has to run per window, not per buffer.
+local function enable_conceal()
+  local ok, image = pcall(require, "snacks.image")
+  if not ok or not image.config.enabled then return end
+  if vim.wo.conceallevel < 2 then vim.wo.conceallevel = 2 end
+  -- leave `concealcursor` empty so the raw source reappears on the cursor line
+end
+
 ---@type LazySpec
 return {
   {
@@ -41,7 +61,7 @@ return {
         snacks_image_bootstrap = {
           {
             event = "FileType",
-            pattern = { "markdown", "typst", "tex", "latex", "html", "norg", "markdown_inline" },
+            pattern = doc_filetypes,
             desc = "Bootstrap snacks.image inline rendering for doc buffers",
             callback = function(args)
               local ok, image = pcall(require, "snacks.image")
@@ -50,6 +70,19 @@ return {
               -- attach THIS buffer with its real bufnr (snacks' autocmd registered
               -- during setup() above won't fire for the already-open buffer)
               require("snacks.image.doc").attach(args.buf)
+              enable_conceal()
+            end,
+          },
+        },
+        -- FileType only fires once per buffer, so a later `:split`/`:vsplit` would
+        -- get a fresh window still at conceallevel=0. BufWinEnter covers every
+        -- window the buffer is displayed in.
+        snacks_image_conceal = {
+          {
+            event = "BufWinEnter",
+            desc = "Enable conceal so snacks.image can hide math source",
+            callback = function(args)
+              if is_doc_filetype[vim.bo[args.buf].filetype] then enable_conceal() end
             end,
           },
         },
