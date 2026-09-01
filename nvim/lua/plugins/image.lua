@@ -32,6 +32,49 @@ local function enable_conceal()
   -- leave `concealcursor` empty so the raw source reappears on the cursor line
 end
 
+-- Fix ```math fenced blocks.
+--
+-- snacks captures the whole `fenced_code_block` as the image range and relies
+-- on one conceal extmark spanning that range to hide the source. But it skips
+-- creating that extmark when the range's first row is already concealed
+-- (`is_concealed` in snacks/image/placement.lua), and Neovim's bundled
+-- markdown highlights set `conceal_lines` on `fenced_code_block_delimiter`.
+-- So at conceallevel>=2 the conceal is skipped, the content line is never
+-- hidden, and the LaTeX source trails out past the rendered image.
+--
+-- Capturing `code_fence_content` as the range instead points it at the
+-- content line, which carries no `conceal_lines`, so snacks conceals it and
+-- draws the image exactly as it does for $$...$$. The delimiter lines are
+-- hidden by Neovim's own query.
+--
+-- This replaces snacks' markdown "images" query wholesale, because an
+-- `; extends` query file can only add rules, never correct one. The mermaid
+-- rule is therefore carried over verbatim. Revisit if snacks changes
+-- queries/markdown/images.scm upstream.
+local markdown_images_query = [[
+(fenced_code_block
+  (info_string (language) @lang)
+  (#eq? @lang "math")
+  (code_fence_content) @image.content @image
+  (#set! image.lang "latex")
+  (#set! image.ext "math.tex"))
+
+(fenced_code_block
+  (info_string (language) @lang)
+  (#eq? @lang "mermaid")
+  (code_fence_content) @image.content
+  (#set! injection.language "mermaid")
+  (#set! image.ext "chart.mmd")
+) @image
+]]
+
+local query_patched = false
+local function patch_markdown_query()
+  if query_patched then return end
+  query_patched = true
+  pcall(vim.treesitter.query.set, "markdown", "images", markdown_images_query)
+end
+
 ---@type LazySpec
 return {
   {
@@ -66,6 +109,7 @@ return {
             callback = function(args)
               local ok, image = pcall(require, "snacks.image")
               if not ok or not image.config.enabled then return end
+              patch_markdown_query() -- must run before the buffer is scanned for images
               image.setup() -- idempotent; registers snacks' own FileType->attach autocmd
               -- attach THIS buffer with its real bufnr (snacks' autocmd registered
               -- during setup() above won't fire for the already-open buffer)
