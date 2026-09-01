@@ -3,6 +3,9 @@
 #
 #   snapshot-doctor.sh              report on `last` and every stored snapshot
 #   snapshot-doctor.sh --rollback   repoint `last` at the newest valid snapshot
+#   snapshot-doctor.sh --prune [d]  keep the newest snapshot per session, drop
+#                                   sessions unseen for d days (default
+#                                   SNAPSHOT_MAX_AGE_DAYS), never removing `last`
 
 set -uo pipefail
 
@@ -44,6 +47,34 @@ report() {
 	done < <(ls -1t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null)
 	echo
 	echo "  $total snapshot(s): $good valid, $bad invalid"
+	# Same walk prune_snapshots does, but reporting instead of deleting.
+	local cutoff live=0 stale=0 keep=0
+	cutoff=$(( $(date +%s) - SNAPSHOT_MAX_AGE_DAYS * 86400 ))
+	local -A seen=() keepers=()
+	local sess mt bn
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		bn="$(basename "$f")"
+		mt="$(stat -c %Y "$f" 2>/dev/null || echo 0)"
+		while IFS= read -r sess; do
+			[ -n "$sess" ] || continue
+			if [ -z "${seen[$sess]:-}" ]; then
+				seen[$sess]=1
+				if [ "$mt" -ge "$cutoff" ]; then
+					live=$((live + 1)); keepers[$bn]=1
+				else
+					stale=$((stale + 1))
+				fi
+			fi
+		done < <(awk -F'\t' '$1=="pane" && $2!="" && !x[$2]++ { print $2 }' "$f")
+	done < <(ls -1t "$RESURRECT_DIR"/tmux_resurrect_*.txt 2>/dev/null)
+	keep=${#keepers[@]}
+	echo "  sessions: $live current, $stale older than ${SNAPSHOT_MAX_AGE_DAYS}d"
+	if [ "$total" -gt "$keep" ]; then
+		echo "  retention: $keep file(s) pinned, $((total - keep)) superseded - run $0 --prune"
+	else
+		echo "  retention: nothing superseded"
+	fi
 	echo
 
 	reason="$(validate_archive "$ARCHIVE_FILE")"
@@ -75,8 +106,15 @@ rollback() {
 	return 1
 }
 
+prune() {
+	local removed
+	removed="$(prune_snapshots "${1:-$SNAPSHOT_MAX_AGE_DAYS}")" || return 1
+	echo "pruned $removed snapshot(s); kept the newest per session seen within ${1:-$SNAPSHOT_MAX_AGE_DAYS} days, plus whatever last points at"
+}
+
 case "${1:-}" in
 	--rollback) rollback ;;
+	--prune) prune "${2:-}" ;;
 	""|--report) report ;;
-	*) echo "usage: $(basename "$0") [--report|--rollback]" >&2; exit 2 ;;
+	*) echo "usage: $(basename "$0") [--report|--rollback|--prune [n]]" >&2; exit 2 ;;
 esac

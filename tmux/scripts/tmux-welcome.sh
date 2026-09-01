@@ -79,8 +79,16 @@ land_on() {
 # picked snapshot), then jump to a restored session.
 do_restore() {
 	"$RESTORE_WRAPPER"
-	local target
-	target="$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -vx "$WELCOME" | head -1)"
+	# Prefer the session that was active when the snapshot was taken. head -1 is
+	# only a fallback: list-sessions sorts by name, so restoring six sessions
+	# used to drop you on whichever one sorted first, never mind where you were.
+	local target want
+	want="$(snapshot_active_session "$LAST_LINK")"
+	if [ -n "$want" ] && tmux has-session -t "=$want" 2>/dev/null && [ "$want" != "$WELCOME" ]; then
+		target="$want"
+	else
+		target="$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -vx "$WELCOME" | head -1)"
+	fi
 	if [ -n "$target" ]; then
 		land_on "$target"
 	else
@@ -100,15 +108,21 @@ restore_pick() {
 		exec "$0" --inside
 	fi
 	for base in "${files[@]}"; do
-		local bytes reason
-		bytes=$(stat -c '%s' "$RESURRECT_DIR/$base" 2>/dev/null || echo 0)
+		local reason sessions
 		if reason="$(validate_snapshot "$RESURRECT_DIR/$base" 2>/dev/null)"; then :; else
 			reason="INVALID: $reason"
 		fi
-		menu+="$(printf '%s\t%s\t%sB\t%s' "$base" "$(snap_time "$base")" "$bytes" "$reason")"$'\n'
+		# A snapshot holds the whole server, so this is a set, not one name.
+		sessions="$(snapshot_sessions "$RESURRECT_DIR/$base")"
+		[ -n "$sessions" ] || sessions="-"
+		menu+="$(printf '%s\t%s\t%s\t%s' "$base" "$(snap_time "$base")" "$sessions" "$reason")"$'\n'
 	done
+	# The basename stays as column 1 because the selected row is parsed back into
+	# a filename below, but --with-nth hides it: you pick by time and session
+	# name, not by a timestamp you have to decode. fzf still returns the whole
+	# line, so the hidden column survives the round trip.
 	choice="$(printf '%s' "$menu" | column -t -s $'\t' |
-		fzf --prompt='snapshot > ' --height='100%' --reverse \
+		fzf --prompt='snapshot > ' --height='100%' --reverse --with-nth=2.. \
 		    --header='Pick a point-in-time to restore (Esc to go back)')" || exec "$0" --inside
 	[ -n "$choice" ] || exec "$0" --inside
 	base="${choice%% *}"
@@ -150,7 +164,9 @@ main() {
 	for s in "${live[@]}"; do opts+=("attach: $s"); done
 	opts+=("new: create a session (asks for a name)…")
 	if [ -e "$LAST_LINK" ] && validate_snapshot "$LAST_LINK" >/dev/null 2>&1; then
-		latest_label="restore: latest snapshot ($(snap_time "$(readlink -f "$LAST_LINK")"))"
+		local latest_sessions
+		latest_sessions="$(snapshot_sessions "$LAST_LINK")"
+		latest_label="restore: latest snapshot ($(snap_time "$(readlink -f "$LAST_LINK")")) - ${latest_sessions:-?}"
 		opts+=("$latest_label")
 	fi
 	opts+=("restore: pick a snapshot…")

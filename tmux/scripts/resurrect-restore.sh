@@ -29,6 +29,17 @@ main() {
 		return 0
 	fi
 
+	# restore.sh derives its socket from $TMUX (tmux_socket, restore.sh:103),
+	# so run from a plain shell it builds `tmux -S "" new-session`, every
+	# session creation fails, and main() still reports "Tmux restore complete".
+	# Verified 2026-09-01: a restore into a server with no client restored
+	# nothing at all and said it had succeeded. Refuse loudly instead.
+	if [ -z "${TMUX:-}" ]; then
+		log "restore aborted: not running inside tmux (restore.sh needs \$TMUX to find the socket)"
+		notify "tmux-resurrect: run the restore from inside tmux"
+		return 0
+	fi
+
 	local reason
 	reason="$(validate_snapshot "$LAST_LINK")"
 	if [ $? -ne 0 ]; then

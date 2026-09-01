@@ -18,6 +18,7 @@
 #   - a rejected save also restores the previous pane-contents tarball, so the
 #     snapshot and the tarball stay in sync
 #   - only one save runs at a time
+#   - snapshots are pruned to the newest per session, never touching `last`
 
 set -uo pipefail
 
@@ -55,6 +56,23 @@ run_save() {
 		return 0
 	fi
 
+	# Only the primary server may write. The snapshot dir and `last` are shared
+	# across every socket, so a throwaway server (tmux -L something) inherits
+	# this config, fires the client-detached hook on exit, and overwrites the
+	# real session state with its own. That is not hypothetical: it clobbered
+	# `last` and the pane-contents tarball on 2026-09-01. $TMUX is only set when
+	# we are invoked from inside a server (the hook); the timer and the systemd
+	# units run outside one and are unaffected.
+	if [ -n "${TMUX:-}" ]; then
+		local socket="${TMUX%%,*}"
+		case "$socket" in
+			*/default) ;;
+			*)
+				log "save skipped: non-default socket ($socket)"
+				return 0 ;;
+		esac
+	fi
+
 	prev_target="$(readlink "$LAST_LINK" 2>/dev/null || true)"
 	prev_snap="$(readlink -f "$LAST_LINK" 2>/dev/null || true)"
 
@@ -77,6 +95,22 @@ run_save() {
 	# save_all() deletes its output and leaves `last` alone when the new dump is
 	# byte-identical to the previous one. Nothing changed, so nothing to check.
 	if [ -n "$prev_target" ] && [ "$new_target" = "$prev_target" ]; then
+		# The layout is unchanged, but save.sh still recaptured the pane
+		# contents and the post-save-all trim hook still rewrote the archive,
+		# so it needs checking here too. Every other exit path validates it;
+		# without this the one path that discards the backup is also the one
+		# that never looks at what it is discarding.
+		if [ "$want_contents" = "on" ]; then
+			reason="$(validate_archive "$ARCHIVE_FILE")"
+			if [ $? -ne 0 ]; then
+				log "save: no change since $prev_target, but pane contents archive invalid - $reason (restoring previous archive)"
+				if [ -f "$ARCHIVE_BACKUP" ]; then
+					mv -T "$ARCHIVE_BACKUP" "$ARCHIVE_FILE" 2>/dev/null ||
+						log "warning: could not restore previous pane contents archive"
+				fi
+				return 1
+			fi
+		fi
 		rm -f "$ARCHIVE_BACKUP"
 		log "save: no change since $prev_target"
 		return 0
@@ -102,6 +136,14 @@ run_save() {
 
 	rm -f "$ARCHIVE_BACKUP"
 	log "saved $new_target - snapshot $snap_report, contents $archive_report"
+
+	# Only prune once a new snapshot is safely in place, so a run that ends in
+	# rollback never also thins the history it might have to roll back into.
+	local pruned
+	pruned="$(prune_snapshots)"
+	if [ "${pruned:-0}" -gt 0 ]; then
+		log "pruned $pruned snapshot(s) superseded per session (age cap ${SNAPSHOT_MAX_AGE_DAYS}d)"
+	fi
 	return 0
 }
 
